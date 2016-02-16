@@ -1,5 +1,5 @@
 // asm85 - an 8085 assembler
-// 
+//
 // Copyright (c) 2016 Tom Nisbet
 // Licensed under the MIT license
 
@@ -146,11 +146,11 @@ int AsmLine::Failure(int status, const char * pMsg, const char * pParam)
 {
     if (pParam)
     {
-        sprintf(errorMsg, "%s: %s\n", pMsg, pParam);
+        sprintf(errorMsg, "%s: %s", pMsg, pParam);
     }
     else
     {
-        sprintf(errorMsg, "%s\n", pMsg);
+        sprintf(errorMsg, "%s", pMsg);
     }
 
     return status;
@@ -702,12 +702,12 @@ int main(int argc, char * argv[])
         {
         case AsmLine::RET_ERROR:
             printf("%d: ERROR - %s\n", lineNum, asmLine.GetErrorMsg());
-            fprintf(listFile, "ERROR - %s\n", asmLine.GetErrorMsg());
+            fprintf(listFile, "ERROR - %s\n\n", asmLine.GetErrorMsg());
             ++errorCount;
             break;
         case AsmLine::RET_WARNING:
             printf("%d: WARNING - %s\n", lineNum, asmLine.GetErrorMsg());
-            fprintf(listFile, "WARNING - %s\n", asmLine.GetErrorMsg());
+            fprintf(listFile, "WARNING - %s\n\n", asmLine.GetErrorMsg());
             ++warningCount;
             break;
         }
