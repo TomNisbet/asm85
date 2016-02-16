@@ -635,8 +635,14 @@ int main(int argc, char * argv[])
             printf("%d: ERROR - %s\n", lineNum, asmLine.GetErrorMsg());
             ++errorCount;
         }
-
-        addr = asmLine.GetStartAddr() + asmLine.GetNumBytes();
+        else if (status == AsmLine::RET_DIR_DS)
+        {
+            addr = asmLine.GetStartAddr() + asmLine.GetAuxValue();
+        }
+        else
+        {
+            addr = asmLine.GetStartAddr() + asmLine.GetNumBytes();
+        }
         ++lineNum;
     }
     if (errorCount > 0)
@@ -677,7 +683,8 @@ int main(int argc, char * argv[])
         }
         else if (status == AsmLine::RET_DIR_DS)
         {
-            fprintf(listFile, "+%04x            ", asmLine.GetAuxValue());
+            fprintf(listFile, "%04x +%04x       ",
+                    addr, asmLine.GetAuxValue());
             addr += asmLine.GetAuxValue();
         }
         else if (byteCount)
