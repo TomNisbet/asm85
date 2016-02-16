@@ -1,5 +1,5 @@
 # asm85
-Intel 8085 Assembler
+Intel 8085 Assembler with expressions and directives
 
 This is an assembler for Intel 8080 and 8085 processors.  It produces Intel Hex format object files as output.  A separate list file is also created that contains all of the assembled data and opcodes as well as a symbol table.
 
