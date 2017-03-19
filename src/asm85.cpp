@@ -237,41 +237,51 @@ int AsmLine::ProcessInstruction()
 {
     enum { ST_SEARCHING, ST_NOT_FOUND, ST_SUCCESS } state = ST_SEARCHING;
     bool bMnemonicFound = false;
+    bool bSecondArg = false;
     int numRegs = 0;
-    char arg1[4];
-    char arg2[4];
-    arg1[0] = '\0';
-    arg2[0] = '\0';
+    char reg1[4];
+    char reg2[4];
+    reg1[0] = '\0';
+    reg2[0] = '\0';
 
-    // Look for <ID> or <ID>,<ID> and count that as one or two registers.  Note
-    // that this can overcount because the last identifier seen might be the
-    // start of an expression, rather then a register name.  For example,
-    // "JMP X+4" would be counted as one register and
-    // "LXI A,X+2" would be counted as two, even though these are really zero
-    // and one register, respectively.  As long as the registers are not
-    // UNDERCOUNTED, things will work out fine.
-    // This also accepts <CONST> or <CONST>,<ID> to deal with the RST
-    // instructions that require a numeric argument instead of a register name.
-    if (((scanner.GetType() == Scanner::T_IDENTIFIER) ||
-         (scanner.GetType() == Scanner::T_CONSTANT)) &&
-        (scanner.GetLength() < int(sizeof(arg1))))
+    // Handle the RST instructions as a special case because the instructions
+    // are differentiated by a numeric argument instead of a register name.
+    if (strcasecmp(pMnemonic, "RST") == 0)
     {
-        // First argument is an identifier.  It may be a register or it may be
-        // the start of an expression.
-        strcpy(arg1, scanner.GetString());
+        const char * arg = scanner.GetString();
+        if ((scanner.GetType() != Scanner::T_CONSTANT) ||
+            (strlen(arg) != 1) || (*arg < '0') || (*arg > '7'))
+        {
+            return Failure(RET_ERROR, "RST instruction argument must be 0-7", arg);
+        }
+        bytes[numBytes++] = 0xc7 | ((*arg - '0') << 3);
+        if (scanner.Next() != Scanner::T_EOF)
+        {
+            return Failure(RET_ERROR, "Found extra arguments after RST instruction:", scanner.GetString());
+        }
+        return RET_OK;
+    }
+
+    // Look for <register> or <register>,<register> and set the register count.
+    if (scanner.GetType() == Scanner::T_REGISTER)
+    {
+        strcpy(reg1, scanner.GetString());
         ++numRegs;
         if (scanner.PeekChar() == ',')
         {
-            // If the next token is a comma, then the first identifier must be
-            // a register argument.  A second identifier may be a register
-            // or it may be the start of an expression.
+            // If the next token is a comma, then a second argument is
+            // present that may be a register or the start of an expression.
             scanner.Next(); // Get the comma
-            scanner.Next(); // Identifier or start of expr
-            if ((scanner.GetType() == Scanner::T_IDENTIFIER) &&
-                (scanner.GetLength() < int(sizeof(arg2))))
+            scanner.Next(); // Register or start of expr
+            if (scanner.GetType() == Scanner::T_REGISTER)
             {
-                strcpy(arg2, scanner.GetString());
+                strcpy(reg2, scanner.GetString());
                 ++numRegs;
+            }
+            else
+            {
+                // Take note of the second, non-register arg for error check.
+                bSecondArg = true;
             }
         }
     }
@@ -284,18 +294,29 @@ int AsmLine::ProcessInstruction()
         {
 //printf("Inst=[%02x  %4s %s,%s  %d],  found=[%d, %s, %s]\n",
 //       pInst->opcode, pInst->mnemonic, pInst->reg1, pInst->reg2, pInst->nRegs,
-//       numRegs, arg1, arg2);
+//       numRegs, reg1, reg2);
             bMnemonicFound = true;
-            if (pInst->nRegs > numRegs)
+            if (pInst->nRegs != numRegs)
             {
-                return Failure(RET_ERROR, "Not enough register arguments for instruction", pMnemonic);
+                return Failure(RET_ERROR, "Wrong number of register arguments for instruction", pMnemonic);
             }
-            if ((pInst->nRegs >= 1) && (strcasecmp(pInst->reg1, arg1) != 0))  continue;
-            if ((pInst->nRegs == 2) && (strcasecmp(pInst->reg2, arg2) != 0))  continue;
+            if ((pInst->nRegs >= 1) && (strcasecmp(pInst->reg1, reg1) != 0))  continue;
+            if ((pInst->nRegs == 2) && (strcasecmp(pInst->reg2, reg2) != 0))  continue;
             bytes[numBytes++] = pInst->opcode;
 
-            if (pInst->argType != EX_NONE)
+            // Process additional argument, if needed.
+            if (pInst->argType == EX_NONE)
             {
+                if (!bSecondArg)
+                {
+                    // If a non-register arg was not seen, the current token
+                    // is the last register.  Scan past it for the EOL check.
+                    scanner.Next();
+                }
+            }
+            else
+            {
+                // Instruction requires an expression argument.
                 unsigned val = EvaluateExpression();
                 if (val == EXPR_ERROR)
                 {
@@ -319,6 +340,11 @@ int AsmLine::ProcessInstruction()
 
     if (state == ST_SUCCESS)
     {
+        if (scanner.GetType() != Scanner::T_EOF)
+        {
+            return Failure(RET_ERROR, "Additional arguments after instruction",
+                           scanner.GetString());
+        }
         return RET_OK;
     }
     else if (bMnemonicFound)
@@ -344,6 +370,9 @@ int AsmLine::StoreArgList(int size)
     {
         if ((scanner.GetType() == Scanner::T_STRING) && (scanner.GetLength() > 1))
         {
+            // Strings of length greater than one are stored as a series of
+            // bytes.  Single character strings may be treated as a single
+            // byte or as a numeric part of a larger expression.
             memcpy(bytes + numBytes, scanner.GetBuffer(), scanner.GetLength());
             numBytes += scanner.GetLength();
             scanner.Next();
@@ -375,6 +404,11 @@ int AsmLine::StoreArgList(int size)
         scanner.Next();
     }
 
+    if (scanner.GetType() != Scanner::T_EOF)
+    {
+        return Failure(RET_WARNING, "Found additonal characters after expression list:",
+                       scanner.GetString());
+    }
     return RET_OK;
 }
 

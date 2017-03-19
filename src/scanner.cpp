@@ -52,7 +52,7 @@ int Scanner::Init(const char * ln)
 
     else if (!isspace(*pCursor) && (*pCursor != ';') && (*pCursor != '\0'))
     {
-        return Failure("Illegal character in column 1.  Must be label or space, found", pCursor);
+        return Failure("Illegal character in column 1.  Must be label, comment, or space. Found:", pCursor);
     }
 
     // No label and first character was space.  Return the first token.
@@ -153,7 +153,16 @@ int Scanner::ScanIdentifier()
     }
     *p = '\0';
 
-    tokenType = T_IDENTIFIER;
+    // Check to see if the string is a reserved register name.
+    if (((tokenStr[1] == '\0') && (strchr("ABCDEHLM", toupper(tokenStr[0])) != NULL)) ||
+        (strcasecmp(tokenStr, "SP") == 0) || (strcasecmp(tokenStr, "PSW") == 0))
+    {
+        tokenType = T_REGISTER;
+    }
+    else
+    {
+        tokenType = T_IDENTIFIER;
+    }
     tokenValue = 0;
     return tokenType;
 }

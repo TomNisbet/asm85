@@ -20,6 +20,7 @@ public:
         T_ERROR,
         T_EOF,
         T_LABEL,
+        T_REGISTER,
         T_IDENTIFIER,
         T_CONSTANT,
         T_STRING,
@@ -56,7 +57,7 @@ public:
     const char * GetErrorMsg() { return errorMsg; }
 
 private:
-    enum 
+    enum
     {
         BUFFER_SIZE = 256
     };
