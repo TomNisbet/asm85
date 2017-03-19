@@ -1,10 +1,12 @@
 // A table to store the instruction and data bytes from the assembly process.
 // Includes a method to write the entire store to an Intel Hex file.
-// 
+//
 // Copyright (c) 2016 Tom Nisbet
 // Licensed under the MIT license
 //
 #include "imagestore.h"
+
+#include <string.h>
 
 ImageStore::ImageStore(unsigned entries)
 {
@@ -77,4 +79,20 @@ void ImageStore::WriteHexFile(FILE * f)
     }
     fprintf(f, ":00000001FF\n");
 }
+
+
+void ImageStore::WriteBinFile(FILE * f, uint16_t startAddr, uint16_t endAddr)
+{
+    uint8_t mem[65536];
+
+    memset(mem, 0xff, sizeof(mem));
+    for (unsigned ix = 0; (ix < numEntries); ix++)
+    {
+        mem[pStore[ix].addr] = pStore[ix].value;
+    }
+
+    size_t writeSize = endAddr - startAddr + 1;
+    fwrite(mem + startAddr, 1, writeSize, f);
+}
+
 

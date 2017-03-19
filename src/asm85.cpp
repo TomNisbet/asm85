@@ -282,9 +282,10 @@ int AsmLine::ProcessInstruction()
         int cmp = strcasecmp(pInst->mnemonic, pMnemonic);
         if (cmp == 0)
         {
+//printf("Inst=[%02x  %4s %s,%s  %d],  found=[%d, %s, %s]\n",
+//       pInst->opcode, pInst->mnemonic, pInst->reg1, pInst->reg2, pInst->nRegs,
+//       numRegs, arg1, arg2);
             bMnemonicFound = true;
-//            int needed = pInst->nregs + ((pInst->args == 0) ? 0 : 1);
-//printf("num=%d  needed=%d a1=%s  a2=%s\n", numArgs, needed, arg1, arg2);
             if (pInst->nRegs > numRegs)
             {
                 return Failure(RET_ERROR, "Not enough register arguments for instruction", pMnemonic);
@@ -570,21 +571,51 @@ int main(int argc, char * argv[])
     char * asmName;
     char * listName;
     char * hexName;
+    char * binName;
     FILE * asmFile;
     FILE * listFile;
     FILE * hexFile;
+    FILE * binFile;
     unsigned addr = 0;
     ImageStore image(65536);
+    char * binAddrs[100];
+    int numBins = 0;
+    int c;
 
-    if (argc == 2)
+    opterr = 0;
+    while ((c = getopt (argc, argv, "b:")) != -1)
     {
-        asmName = argv[1];
+        switch (c)
+        {
+        case 'b':
+            if ((strlen(optarg) != 9) || (optarg[4] != ':') ||
+                (strspn(optarg, "0123456789abcdefABCDEF:") != 9))
+            {
+                fprintf(stderr,
+                        "option for -b must be hex start and end in the form: ssss:eeee\n");
+                abort();
+            }
+            binAddrs[numBins++] = strdup(optarg);
+            break;
+        case '?':
+            if (optopt == 'b')
+                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+            else if (isprint (optopt))
+                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+            else
+                fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
+            return 1;
+        default:
+            abort ();
+        }
     }
-    else
+
+    if (optind != argc - 1)
     {
         fprintf(stderr, "usage: %s <file.asm>\n", argv[0]);
         exit(1);
     }
+    asmName = argv[optind];
 
     // Enforce that the input file name must end in ".asm".  It makes the file
     // name computation a lot easier and it guards against accidentally using
@@ -750,6 +781,32 @@ int main(int argc, char * argv[])
 
     image.WriteHexFile(hexFile);
     fclose(hexFile);
+
+    if (numBins > 0)
+    {
+        int aLen = strlen(asmName);
+        binName = (char *) malloc(aLen + 6);
+
+        for (int ix = 0; (ix < numBins); ix++)
+        {
+            // From "file.asm" and address "1234:5678", make "file-1234.bin".
+            strcpy(binName, asmName);
+            binName[aLen - 4] = '-';
+            binAddrs[ix][4] = '\0';
+            strcpy(binName + aLen - 3, binAddrs[ix]);
+            strcpy(binName + aLen + 1, ".bin");
+            if ((binFile = fopen(binName, "wb")) == NULL)
+            {
+                fprintf(stderr, "Error opening file for write: %s\n", binName);
+                return -1;
+            }
+            unsigned start = (unsigned) strtoul(binAddrs[ix], NULL, 16);
+            unsigned end = (unsigned) strtoul(binAddrs[ix] + 5, NULL, 16);
+            image.WriteBinFile(binFile, start, end);
+            fclose(binFile);
+        }
+        free(binName);
+    }
 
     return 0;
 }

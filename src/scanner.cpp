@@ -107,7 +107,7 @@ int Scanner::Next()
             Failure("Illegal character", pCursor);
         }
 
-        // Store the cahracter as the string and skip to next character.
+        // Store the character as the string and skip to next character.
         tokenStr[0] = *pCursor++;
         tokenStr[1] = '\0';
     }

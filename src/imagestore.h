@@ -18,6 +18,7 @@ public:
     void Store(unsigned addr, uint8_t val);
     void Store(unsigned addr, const uint8_t * values, unsigned numValues);
     void WriteHexFile(FILE * f);
+    void WriteBinFile(FILE * f, uint16_t startAddr, uint16_t endAddr);
 
 private:
     class ImageStoreEntry
