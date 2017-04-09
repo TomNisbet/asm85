@@ -40,7 +40,7 @@ class AsmLine
     {
         BUFFER_SIZE = 256,
         SMALL_BUFFER_SIZE = 32,
-        EXPR_ERROR = 0xffffffff     // Error value for Expression Evaluators.
+        EXPR_ERROR = 0x80000000     // Error value for Expression Evaluators.
     };
 
     AsmLine();
@@ -86,6 +86,7 @@ AsmLine::AsmLine()
 
 int AsmLine::Process(const char * line, uint16_t addr, int ps)
 {
+    strcpy(errorMsg, "asm85");
     startAddr = addr;
     pass = ps;
     numBytes = 0;
