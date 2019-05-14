@@ -146,7 +146,7 @@ int Scanner::ScanIdentifier()
 {
     // Copy the identifier into the token string.
     char * p = tokenStr;
-    while ((isalnum(*pCursor) || (*pCursor == '_') || (*pCursor == '.')) &&
+    while ((isalnum(*pCursor) || (*pCursor == '_') || (*pCursor == '.') || (*pCursor == '$')) &&
            (p < (tokenStr + sizeof(tokenStr) - 1)))
     {
         *p++ = *pCursor++;
