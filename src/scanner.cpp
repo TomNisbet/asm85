@@ -10,7 +10,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "Scanner.h"
+#include "scanner.h"
 
 
 // Initialize the scanner with a new source line and do preliminary scan to see if a

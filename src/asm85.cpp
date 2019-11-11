@@ -597,7 +597,14 @@ unsigned AsmLine::EvaluateExpression()
 }
 
 
-
+void usage()
+{
+    fprintf(stderr, "usage: %s [-b ssss:eeee] <file.asm>\n", "asm85");
+    fprintf(stderr, "  -b  Specify an address range to output as a binary image\n");
+    fprintf(stderr, "      The option for -b must be hex start and end in the form: ssss:eeee\n");
+    fprintf(stderr, "      Multiple -b options can be specified.  Each one will create a binary file.\n");
+    exit(-1);
+}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char * argv[])
@@ -628,7 +635,7 @@ int main(int argc, char * argv[])
             {
                 fprintf(stderr,
                         "option for -b must be hex start and end in the form: ssss:eeee\n");
-                abort();
+                usage();
             }
             binAddrs[numBins++] = strdup(optarg);
             break;
@@ -639,16 +646,15 @@ int main(int argc, char * argv[])
                 fprintf (stderr, "Unknown option `-%c'.\n", optopt);
             else
                 fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
-            return 1;
+            usage();
         default:
-            abort ();
+            usage ();
         }
     }
 
     if (optind != argc - 1)
     {
-        fprintf(stderr, "usage: %s <file.asm>\n", argv[0]);
-        exit(1);
+        usage();
     }
     asmName = argv[optind];
 
@@ -658,8 +664,7 @@ int main(int argc, char * argv[])
     int fileNameLen = strlen(asmName);
     if ((fileNameLen < 5) || strcmp(asmName + fileNameLen - 4, ".asm") != 0)
     {
-        fprintf(stderr, "usage: %s <file.asm>\n", argv[0]);
-        return -1;
+        usage();
     }
 
     asmFile = fopen(asmName, "r");

@@ -1,0 +1,23 @@
+asm85 8085 Assembler by nib
+
+(0000)               1: SYSRAMST   equ 00000h
+(2000)               2: SYSRAMSZ   equ 8192
+(2000)               3: SYSRAMEND  equ SYSRAMST + SYSRAMSZ
+(8000)               4: SYSROMST   equ 08000h
+(1000)               5: SYSROMSZ   equ 01000h
+(9000)               6: SYSROMEND  equ SYSROMST + SYSROMSZ
+
+6 lines, 0 errors, 0 warnings
+
+
+SYMBOL TABLE:
+
+SYSRAMST        : 0000 (0)
+SYSRAMSZ        : 2000 (8192)
+SYSRAMEND       : 2000 (8192)
+SYSROMST        : 8000 (32768)
+SYSROMSZ        : 1000 (4096)
+SYSROMEND       : 9000 (36864)
+
+
+Total memory is 0 bytes

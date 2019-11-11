@@ -1,0 +1,23 @@
+asm85 8085 Assembler by nib
+
+0000 21 08 00        1:         LXI  H, TAB2-1
+0003 00              2:         nop	
+0004 c3 07 00        3:         JMP  EXEC
+                     4: 
+0007 00              5: EXEC:   nop
+0008 c9              6: CHKIO:  ret
+                     7: 
+0009 61 62 63 64     8: TAB2:   db      'abcd'
+                     9: 
+
+9 lines, 0 errors, 0 warnings
+
+
+SYMBOL TABLE:
+
+EXEC            : 0007 (7)
+CHKIO           : 0008 (8)
+TAB2            : 0009 (9)
+
+
+Total memory is 13 bytes

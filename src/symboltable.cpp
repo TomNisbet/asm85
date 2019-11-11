@@ -6,7 +6,7 @@
 //
 #include <stdio.h>
 #include <string.h>
-#include "SymbolTable.h"
+#include "symboltable.h"
 
 
 int SymbolTable::Add(const char * name, unsigned val)

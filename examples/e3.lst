@@ -1,0 +1,50 @@
+asm85 8085 Assembler by nib
+
+0000 61 62 63        1: LABEL:  db    "abc"", "def"
+WARNING - Found additonal characters after expression list:: def
+
+0003 c7              2: 	rst	0
+0004 ff              3: 	rst	7
+                     4: 	rst	8
+ERROR - RST instruction argument must be 0-7: 8
+
+                     5: 	rst	30
+ERROR - RST instruction argument must be 0-7: 30
+
+0005 df              6: 	rst	3 + 1
+ERROR - Found extra arguments after RST instruction:: +
+
+                     7: 	rst	c
+ERROR - RST instruction argument must be 0-7: c
+
+0006 df              8: 	rst     3 ; ok
+0007 df              9:         rst     3,x
+ERROR - Found extra arguments after RST instruction:: ,
+
+                    10: 	mov	a
+ERROR - Wrong number of register arguments for instruction: mov
+
+0008 78             11: 	mov	a,b,c
+ERROR - Additional arguments after instruction: ,
+
+                    12: 	mov	f,c
+ERROR - Wrong number of register arguments for instruction: mov
+
+0009 e5             13: 	push	h,4
+ERROR - Additional arguments after instruction: 4
+
+000a 11 00 00       14: 	lxi	d,LABEL
+000d 01             15: 	lxi	b
+ERROR - Expected label or numeric constant, found:: b
+
+                    16: 	
+
+16 lines, 10 errors, 1 warnings
+
+
+SYMBOL TABLE:
+
+LABEL           : 0000 (0)
+
+
+Total memory is 14 bytes
