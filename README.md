@@ -10,9 +10,11 @@ This is a two-pass assembler.  The first pass creates the symbol table and the s
 ## Usage
 Syntax is:
 
-    asm85 [-b ssss:eeee [-b ssss:eeee ...]] <file.asm>
+    asm85 [-b ssss:eeee [-b ssss:eeee ...]] [-g aaaa] <file.asm>
 
 The -b option creates one or more binary image files.  The ssss and eeee arguments are hexadecimal start and end addresses, respectively.  These arguments MUST be 4 hex digits, using leading zeroes if the address is less that 1000 hex.
+
+the -g option adds a Start Segment Address record to the output hex file.  This contains the execution (go) address for the program.  Some loaders may use this to start execution when the download is complete.
 
 If the file test.asm is specified as the input, new files test.lst and test.hex will be created for the listing and hex records.
 

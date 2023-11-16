@@ -7,6 +7,7 @@
 #include "imagestore.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 ImageStore::ImageStore(unsigned entries)
 {
@@ -38,7 +39,7 @@ void ImageStore::Store(unsigned addr, const uint8_t * values, unsigned numValues
 }
 
 
-void ImageStore::WriteHexFile(FILE * f)
+void ImageStore::WriteHexFile(FILE * f, const char * goAddr)
 {
     uint16_t lineAddr;
     uint8_t lineBytes = 0;
@@ -62,7 +63,7 @@ void ImageStore::WriteHexFile(FILE * f)
         checksum += val;
 
         // If the next address is the start of a new block, or if this line
-        // already has 16 characters, print the line.
+        // already has 16 characters, then write a Data record.
         if ((++lineBytes >= LINE_LIMIT) || (pStore[ix+1].addr != (pStore[ix].addr + 1)))
         {
             *p = '\0';
@@ -77,6 +78,15 @@ void ImageStore::WriteHexFile(FILE * f)
             lineBytes = 0;
         }
     }
+
+    // Add a Start Segment Address record with the Go address as the IP field
+    if (goAddr) {
+        unsigned addr = unsigned(strtol(goAddr, 0, 16));
+        checksum = ~(4 + 3 + ((addr >> 8) &0xff) + (addr & 0xff)) + 1;
+        fprintf(f, ":040000030000%04X%02X\n", addr, checksum);
+    }
+
+    // Add an End of File record
     fprintf(f, ":00000001FF\n");
 }
 

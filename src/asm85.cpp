@@ -599,10 +599,12 @@ unsigned AsmLine::EvaluateExpression()
 
 void usage()
 {
-    fprintf(stderr, "usage: %s [-b ssss:eeee] <file.asm>\n", "asm85");
+    fprintf(stderr, "usage: %s [-b ssss:eeee] [-g aaaa] <file.asm>\n", "asm85");
     fprintf(stderr, "  -b  Specify an address range to output as a binary image\n");
     fprintf(stderr, "      The option for -b must be hex start and end in the form: ssss:eeee\n");
     fprintf(stderr, "      Multiple -b options can be specified.  Each one will create a binary file.\n");
+    fprintf(stderr, "  -g  Specify a go address for the image to be wrtten the HEX file.\n");
+    fprintf(stderr, "      The option for -g must be 4-digit hex address\n");
     exit(-1);
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -621,11 +623,12 @@ int main(int argc, char * argv[])
     unsigned addr = 0;
     ImageStore image(65536);
     char * binAddrs[100];
+    char * goAddr = NULL;
     int numBins = 0;
     int c;
 
     opterr = 0;
-    while ((c = getopt (argc, argv, "b:")) != -1)
+    while ((c = getopt (argc, argv, "b:g:")) != -1)
     {
         switch (c)
         {
@@ -638,6 +641,15 @@ int main(int argc, char * argv[])
                 usage();
             }
             binAddrs[numBins++] = strdup(optarg);
+            break;
+        case 'g':
+            if ((strlen(optarg) != 4) || (strspn(optarg, "0123456789abcdefABCDEF") != 4))
+            {
+                fprintf(stderr,
+                        "option for -g must be hex execution address in the form: aaaa\n");
+                usage();
+            }
+            goAddr = strdup(optarg);
             break;
         case '?':
             if (optopt == 'b')
@@ -819,7 +831,7 @@ int main(int argc, char * argv[])
     fprintf(listFile, "\n\nTotal memory is %d bytes\n", image.GetNumEntries());
     fclose(listFile);
 
-    image.WriteHexFile(hexFile);
+    image.WriteHexFile(hexFile, goAddr);
     fclose(hexFile);
 
     if (numBins > 0)

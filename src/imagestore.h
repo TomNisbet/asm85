@@ -17,7 +17,7 @@ public:
     unsigned GetNumEntries() { return numEntries; }
     void Store(unsigned addr, uint8_t val);
     void Store(unsigned addr, const uint8_t * values, unsigned numValues);
-    void WriteHexFile(FILE * f);
+    void WriteHexFile(FILE * f, const char * goAddr);
     void WriteBinFile(FILE * f, uint16_t startAddr, uint16_t endAddr);
 
 private:
