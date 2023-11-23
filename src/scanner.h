@@ -12,11 +12,9 @@
 
 #include <stdint.h>
 
-class Scanner
-{
+class Scanner {
 public:
-    enum
-    {
+    enum {
         T_ERROR,
         T_EOF,
         T_LABEL,
@@ -34,8 +32,7 @@ public:
         T_FACTOR_OPER
     };
 
-    enum
-    {
+    enum {
         V_OR,
         V_XOR,
         V_AND,
@@ -57,8 +54,7 @@ public:
     const char * GetErrorMsg() { return errorMsg; }
 
 private:
-    enum
-    {
+    enum {
         BUFFER_SIZE = 256
     };
 
@@ -79,4 +75,3 @@ private:
 };
 
 #endif
-

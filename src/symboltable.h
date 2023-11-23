@@ -7,26 +7,22 @@
 #ifndef SYMBOLTABLE_H
 #define SYMBOLTABLE_H
 
-class SymbolTableEntry
-{
+class SymbolTableEntry {
 public:
     char *      name;
     unsigned    val;
 };
 
 
-class SymbolTable
-{
+class SymbolTable {
 public:
-    enum
-    {
+    enum {
         RET_OK,
         RET_DUPLICATE,
         RET_NOT_FOUND,
         RET_TABLE_FULL
     };
-    enum
-    {
+    enum {
         MAX_ENTRIES = 66000,    // Plenty for a 16 bit assembler.
         NO_ENTRY    = 0x10000   // Outside of 16 bit range used for val.
     };

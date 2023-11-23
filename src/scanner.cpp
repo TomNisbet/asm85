@@ -18,31 +18,25 @@
 // column where elements appear.
 //
 // Returns the type of the first element seen.
-int Scanner::Init(const char * ln)
-{
+int Scanner::Init(const char * ln) {
     // Save the original line for future calls to Next().
     strncpy(line, ln, sizeof(line));
     line[sizeof(line) - 1] = '\0';
     pCursor = line;
 
     // If the first column is non-white then it is a label.
-    if (isalpha(*pCursor) || (*pCursor == '_'))
-    {
-        if (ScanIdentifier() == T_ERROR)
-        {
+    if (isalpha(*pCursor) || (*pCursor == '_')) {
+        if (ScanIdentifier() == T_ERROR) {
             // Overwrite the error message from ScanIdentifier to read 'label'
             // instead of 'identifier'.
             Failure("Illegal character in label.  Must be alphanum or underscore.");
         }
-        else
-        {
-            if ((*pCursor == ':') || isspace(*pCursor))
-            {
+        else {
+            if ((*pCursor == ':') || isspace(*pCursor)) {
                 tokenType = T_LABEL;
                 ++pCursor;
             }
-            else
-            {
+            else {
                 Failure("Label must end with ':' or space or tab character.");
             }
             tokenValue = 0;
@@ -50,8 +44,7 @@ int Scanner::Init(const char * ln)
         return tokenType;
     }
 
-    else if (!isspace(*pCursor) && (*pCursor != ';') && (*pCursor != '\0'))
-    {
+    else if (!isspace(*pCursor) && (*pCursor != ';') && (*pCursor != '\0')) {
         return Failure("Illegal character in column 1.  Must be label, comment, or space. Found:", pCursor);
     }
 
@@ -61,33 +54,27 @@ int Scanner::Init(const char * ln)
 }
 
 
-int Scanner::Next()
-{
+int Scanner::Next() {
     // Just continue to return ERROR or EOF if in that state.
     if (tokenType == T_ERROR)  return T_ERROR;
     if (tokenType == T_EOF)    return T_EOF;
 
     SkipWhite();
-    if ((isalpha(*pCursor)) || (*pCursor == '_'))
-    {
+    if ((isalpha(*pCursor)) || (*pCursor == '_')) {
         ScanIdentifier();
     }
 
-    else if (isdigit(*pCursor))
-    {
+    else if (isdigit(*pCursor)) {
         ScanConstant();
     }
 
-    else if ((*pCursor == '"') || (*pCursor == '\''))
-    {
+    else if ((*pCursor == '"') || (*pCursor == '\'')) {
         ScanString();
     }
 
-    else
-    {
+    else {
         tokenValue = 0;
-        switch (*pCursor)
-        {
+        switch (*pCursor) {
         case ';':   tokenType = T_EOF;                                  break;
         case '\0':  tokenType = T_EOF;                                  break;
         case ',':   tokenType = T_COMMA;                                break;
@@ -118,49 +105,41 @@ int Scanner::Next()
 }
 
 
-char Scanner::PeekChar()
-{
+char Scanner::PeekChar() {
     // Peek at the next non-white character.
     SkipWhite();
     return *pCursor;
 }
 
 
-int Scanner::GetLength()
-{
+int Scanner::GetLength() {
     // tokenLength is set for STRING types because they don't require a
     // terminating NULL and may contain NULLs within themselves.
-    if (tokenType == T_STRING)
-    {
+    if (tokenType == T_STRING) {
         return tokenLen;
     }
-    else
-    {
+    else {
         return strlen(tokenStr);
     }
 }
 
 
 // On entry, this expects that pCursor points to an identifier character.
-int Scanner::ScanIdentifier()
-{
+int Scanner::ScanIdentifier() {
     // Copy the identifier into the token string.
     char * p = tokenStr;
     while ((isalnum(*pCursor) || (*pCursor == '_') || (*pCursor == '.') || (*pCursor == '$')) &&
-           (p < (tokenStr + sizeof(tokenStr) - 1)))
-    {
+           (p < (tokenStr + sizeof(tokenStr) - 1))) {
         *p++ = *pCursor++;
     }
     *p = '\0';
 
     // Check to see if the string is a reserved register name.
     if (((tokenStr[1] == '\0') && (strchr("ABCDEHLM", toupper(tokenStr[0])) != NULL)) ||
-        (strcasecmp(tokenStr, "SP") == 0) || (strcasecmp(tokenStr, "PSW") == 0))
-    {
+        (strcasecmp(tokenStr, "SP") == 0) || (strcasecmp(tokenStr, "PSW") == 0)) {
         tokenType = T_REGISTER;
     }
-    else
-    {
+    else {
         tokenType = T_IDENTIFIER;
     }
     tokenValue = 0;
@@ -169,37 +148,31 @@ int Scanner::ScanIdentifier()
 
 
 // On entry, this expects that pCursor points to a numeric constant character.
-int Scanner::ScanConstant()
-{
+int Scanner::ScanConstant() {
     int base = 10;
 
     // Copy the constant into the token string.  Note that isxdigit is also
     // catching the 'B' and 'D' suffixes for decimal and binary.
     char * p = tokenStr;
     while ((isxdigit(*pCursor) || (toupper(*pCursor) == 'H')) &&
-           (p < (tokenStr + sizeof(tokenStr) - 1)))
-    {
+           (p < (tokenStr + sizeof(tokenStr) - 1))) {
         *p++ = *pCursor++;
     }
     *p = '\0';
 
     // Check the last character of the string for a base identifier.
     char c = toupper(*--p);
-    if (c == 'H')
-    {
+    if (c == 'H') {
         base = 16;
     }
-    else if (c == 'B')
-    {
+    else if (c == 'B') {
         base = 2;
     }
-    else if ((c == 'D') || isdigit(c))
-    {
+    else if ((c == 'D') || isdigit(c)) {
         // Decimal suffix is optional.
         base = 10;
     }
-    else
-    {
+    else {
         // String ended with A, C, E, or F.  Probably hex with no suffix.
         return Failure("Bad numeric constant.  Hex constants must end with 'H'", tokenStr);
     }
@@ -208,18 +181,14 @@ int Scanner::ScanConstant()
     tokenValue = int(strtol(tokenStr, NULL, base));
 
     // Scan back thru the string and verify the characters all match the base.
-    while (--p >= tokenStr)
-    {
-        if ((base == 10) && !isdigit(*p))
-        {
+    while (--p >= tokenStr) {
+        if ((base == 10) && !isdigit(*p)) {
             return Failure("Illegal character in decimal constant", tokenStr);
         }
-        else if ((base == 2) && (*p != '0') && (*p != '1'))
-        {
+        else if ((base == 2) && (*p != '0') && (*p != '1')) {
             return Failure("Illegal character in binary constant", tokenStr);
         }
-        else if (!isxdigit(*p))
-        {
+        else if (!isxdigit(*p)) {
             return Failure("Illegal character in hex constant", tokenStr);
         }
     }
@@ -229,8 +198,7 @@ int Scanner::ScanConstant()
 
 
 // On entry, this expects that pCursor points to a quote character.
-int Scanner::ScanString()
-{
+int Scanner::ScanString() {
     bool bEscape = false;
     unsigned char c;
     const char * pStr = pCursor;
@@ -240,40 +208,30 @@ int Scanner::ScanString()
     tokenType = T_STRING;
     tokenValue = 0;
 
-    while (*pCursor != '\0')
-    {
-        if (bEscape)
-        {
-            if (*pCursor == 'n')
-            {
+    while (*pCursor != '\0') {
+        if (bEscape) {
+            if (*pCursor == 'n') {
                 c = '\n';
             }
-            else if (*pCursor == 'r')
-            {
+            else if (*pCursor == 'r') {
                 c = '\r';
             }
-            else if (*pCursor == 't')
-            {
+            else if (*pCursor == 't') {
                 c = '\t';
             }
-            else if (*pCursor == '0')
-            {
+            else if (*pCursor == '0') {
                 c = '\0';
             }
-            else if (*pCursor == 'x')
-            {
-                if (isxdigit(pCursor[1]) && isxdigit(pCursor[2]))
-                {
+            else if (*pCursor == 'x') {
+                if (isxdigit(pCursor[1]) && isxdigit(pCursor[2])) {
                     c = (HexDigit(*++pCursor) << 4);
                     c |= HexDigit(*++pCursor);
                 }
-                else
-                {
+                else {
                     return Failure("Bad hex escape in string", pCursor);
                 }
             }
-            else
-            {
+            else {
                 // Any other character following a '\' just returns itself.
                 // This also covers the special cases of \", \', and \\ to
                 // return quotes and \ within a string.
@@ -281,26 +239,22 @@ int Scanner::ScanString()
             }
             bEscape = false;
         }
-        else if (*pCursor == '\\')
-        {
+        else if (*pCursor == '\\') {
             bEscape = true;
             ++pCursor;
             continue;
         }
-        else if (*pCursor == quote)
-        {
+        else if (*pCursor == quote) {
             break;
         }
-        else
-        {
+        else {
             c = *pCursor;
         }
         tokenStr[tokenLen++] = (char) c;
         ++pCursor;
     }
 
-    if (*pCursor != quote)
-    {
+    if (*pCursor != quote) {
         return Failure("Unterminated string", pStr);
     }
 
@@ -311,24 +265,19 @@ int Scanner::ScanString()
 }
 
 
-void Scanner::SkipWhite()
-{
-    while ((*pCursor == ' ') || (*pCursor == '\t'))
-    {
+void Scanner::SkipWhite() {
+    while ((*pCursor == ' ') || (*pCursor == '\t')) {
         ++pCursor;
     }
 }
 
 
-int Scanner::Failure(const char * pMsg, const char * pParam)
-{
+int Scanner::Failure(const char * pMsg, const char * pParam) {
     tokenType = T_ERROR;
-    if (pParam)
-    {
+    if (pParam) {
         sprintf(errorMsg, "%s: %s", pMsg, pParam);
     }
-    else
-    {
+    else {
         sprintf(errorMsg, "%s", pMsg);
     }
 
@@ -336,18 +285,12 @@ int Scanner::Failure(const char * pMsg, const char * pParam)
 }
 
 
-unsigned char Scanner::HexDigit(unsigned char c)
-{
-    if ((c >= '0') && (c <= '9'))
-    {
+unsigned char Scanner::HexDigit(unsigned char c) {
+    if ((c >= '0') && (c <= '9')) {
         return c - '0';
     }
-    else if ((c >= 'A') && (c <= 'F'))
-    {
+    else if ((c >= 'A') && (c <= 'F')) {
         return c - 'A' + 10;
     }
     return c - 'a' + 10;
 }
-
-
-

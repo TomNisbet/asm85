@@ -22,11 +22,9 @@ extern InstructionEntry instructionTable[];
 
 
 ////////////////////////////////////////////////////////////////////////////////
-class AsmLine
-{
+class AsmLine {
   public:
-    enum
-    {
+    enum {
         // Return codes from the processing routines.
         RET_OK,             // Normal processing, data may be present
         RET_DIR_EQU,        // EQU directive, value in auxValue
@@ -36,8 +34,7 @@ class AsmLine
         RET_ERROR,          // Error condition detected
         RET_PASS1_ERROR     // Error that is only detected at pass 1.
     };
-    enum
-    {
+    enum {
         BUFFER_SIZE = 256,
         SMALL_BUFFER_SIZE = 32,
         EXPR_ERROR = 0x80000000     // Error value for Expression Evaluators.
@@ -78,64 +75,53 @@ class AsmLine
 };
 
 
-AsmLine::AsmLine()
-{
+AsmLine::AsmLine() {
     pLabel = pMnemonic = NULL;
 }
 
 
-int AsmLine::Process(const char * line, uint16_t addr, int ps)
-{
+int AsmLine::Process(const char * line, uint16_t addr, int ps) {
     strcpy(errorMsg, "asm85");
     startAddr = addr;
     pass = ps;
     numBytes = 0;
 
-    if (pLabel)
-    {
+    if (pLabel) {
         free(pLabel);
         pLabel = NULL;
     }
-    if (pMnemonic)
-    {
+    if (pMnemonic) {
         free(pMnemonic);
         pMnemonic = NULL;
     }
 
     int t = scanner.Init(line);
-    if (t == Scanner::T_LABEL)
-    {
+    if (t == Scanner::T_LABEL) {
         pLabel = strdup(scanner.GetString());
         t = scanner.Next();
     }
-    if (t == Scanner::T_IDENTIFIER)
-    {
+    if (t == Scanner::T_IDENTIFIER) {
         pMnemonic = strdup(scanner.GetString());
         scanner.Next();
     }
 //    else if ((t != Scanner::T_EOF) && (t != Scanner::T_ERROR))
-    else if (t == Scanner::T_ERROR)
-    {
+    else if (t == Scanner::T_ERROR) {
         return Failure(RET_ERROR, scanner.GetErrorMsg());
     }
 
     int status = RET_NOTHING_DONE;
-    if (pLabel && (pass == 1))
-    {
+    if (pLabel && (pass == 1)) {
         status = symbols.Add(pLabel, startAddr);
-        if (status == SymbolTable::RET_DUPLICATE)
-        {
+        if (status == SymbolTable::RET_DUPLICATE) {
             return Failure(RET_PASS1_ERROR, "Symbol defined more than once", pLabel);
         }
     }
-    if (pMnemonic == NULL)
-    {
+    if (pMnemonic == NULL) {
         return RET_NOTHING_DONE;
     }
 
     status = ProcessDirective();
-    if (status == RET_NOTHING_DONE)
-    {
+    if (status == RET_NOTHING_DONE) {
         status = ProcessInstruction();
     }
 
@@ -143,14 +129,11 @@ int AsmLine::Process(const char * line, uint16_t addr, int ps)
 }
 
 
-int AsmLine::Failure(int status, const char * pMsg, const char * pParam)
-{
-    if (pParam)
-    {
+int AsmLine::Failure(int status, const char * pMsg, const char * pParam) {
+    if (pParam) {
         sprintf(errorMsg, "%s: %s", pMsg, pParam);
     }
-    else
-    {
+    else {
         sprintf(errorMsg, "%s", pMsg);
     }
 
@@ -158,15 +141,12 @@ int AsmLine::Failure(int status, const char * pMsg, const char * pParam)
 }
 
 
-int AsmLine::ProcessDirective()
-{
+int AsmLine::ProcessDirective() {
     int status = RET_NOTHING_DONE;
 
-    if (strcasecmp("ORG", pMnemonic) == 0)
-    {
+    if (strcasecmp("ORG", pMnemonic) == 0) {
         unsigned val = EvaluateExpression();
-        if (val == EXPR_ERROR)
-        {
+        if (val == EXPR_ERROR) {
             // Error message provided by Evaluate.
             return RET_ERROR;
         }
@@ -174,23 +154,18 @@ int AsmLine::ProcessDirective()
         auxValue = uint16_t(val);
         return RET_DIR_EQU; // Same output as EQU
     }
-    else if (strcasecmp("EQU", pMnemonic) == 0)
-    {
-        if (pLabel == NULL)
-        {
+    else if (strcasecmp("EQU", pMnemonic) == 0) {
+        if (pLabel == NULL) {
             return Failure(RET_ERROR, "No label for EQU directive");
         }
-        else
-        {
+        else {
             unsigned val = EvaluateExpression();
-            if (val == EXPR_ERROR)
-            {
+            if (val == EXPR_ERROR) {
                 // Error message provided by Evaluate.
                 return RET_ERROR;
             }
             status = symbols.Update(pLabel, val);
-            if (status != SymbolTable::RET_OK)
-            {
+            if (status != SymbolTable::RET_OK) {
                 // Shouldn't happen because label was added just before this call.
                 return Failure(RET_ERROR, "could not update symbol", pLabel);
             }
@@ -199,21 +174,17 @@ int AsmLine::ProcessDirective()
         }
     }
 
-    else if (strcasecmp("DB", pMnemonic) == 0)
-    {
+    else if (strcasecmp("DB", pMnemonic) == 0) {
         return StoreArgList(1);
     }
 
-    else if (strcasecmp("DW", pMnemonic) == 0)
-    {
+    else if (strcasecmp("DW", pMnemonic) == 0) {
         return StoreArgList(2);
     }
 
-    else if (strcasecmp("DS", pMnemonic) == 0)
-    {
+    else if (strcasecmp("DS", pMnemonic) == 0) {
         unsigned val = EvaluateExpression();
-        if (val == EXPR_ERROR)
-        {
+        if (val == EXPR_ERROR) {
             // Error message provided by Evaluate.
             return RET_ERROR;
         }
@@ -221,8 +192,7 @@ int AsmLine::ProcessDirective()
         return RET_DIR_DS;
     }
 
-    else if (strcasecmp("END", pMnemonic) == 0)
-    {
+    else if (strcasecmp("END", pMnemonic) == 0) {
         // This doesn't really do anything.  Just mark it as processed so
         // it does not get interpreted as a processor instruction.
         return RET_OK;
@@ -234,8 +204,7 @@ int AsmLine::ProcessDirective()
 }
 
 
-int AsmLine::ProcessInstruction()
-{
+int AsmLine::ProcessInstruction() {
     enum { ST_SEARCHING, ST_NOT_FOUND, ST_SUCCESS } state = ST_SEARCHING;
     bool bMnemonicFound = false;
     bool bSecondArg = false;
@@ -247,58 +216,48 @@ int AsmLine::ProcessInstruction()
 
     // Handle the RST instructions as a special case because the instructions
     // are differentiated by a numeric argument instead of a register name.
-    if (strcasecmp(pMnemonic, "RST") == 0)
-    {
+    if (strcasecmp(pMnemonic, "RST") == 0) {
         const char * arg = scanner.GetString();
         if ((scanner.GetType() != Scanner::T_CONSTANT) ||
-            (strlen(arg) != 1) || (*arg < '0') || (*arg > '7'))
-        {
+            (strlen(arg) != 1) || (*arg < '0') || (*arg > '7')) {
             return Failure(RET_ERROR, "RST instruction argument must be 0-7", arg);
         }
         bytes[numBytes++] = 0xc7 | ((*arg - '0') << 3);
-        if (scanner.Next() != Scanner::T_EOF)
-        {
+        if (scanner.Next() != Scanner::T_EOF) {
             return Failure(RET_ERROR, "Found extra arguments after RST instruction:", scanner.GetString());
         }
         return RET_OK;
     }
 
     // Look for <register> or <register>,<register> and set the register count.
-    if (scanner.GetType() == Scanner::T_REGISTER)
-    {
+    if (scanner.GetType() == Scanner::T_REGISTER) {
         strcpy(reg1, scanner.GetString());
         ++numRegs;
-        if (scanner.PeekChar() == ',')
-        {
+        if (scanner.PeekChar() == ',') {
             // If the next token is a comma, then a second argument is
             // present that may be a register or the start of an expression.
             scanner.Next(); // Get the comma
             scanner.Next(); // Register or start of expr
-            if (scanner.GetType() == Scanner::T_REGISTER)
-            {
+            if (scanner.GetType() == Scanner::T_REGISTER) {
                 strcpy(reg2, scanner.GetString());
                 ++numRegs;
             }
-            else
-            {
+            else {
                 // Take note of the second, non-register arg for error check.
                 bSecondArg = true;
             }
         }
     }
 
-    for (int ix = 0; (state == ST_SEARCHING); ix++)
-    {
+    for (int ix = 0; (state == ST_SEARCHING); ix++) {
         InstructionEntry * pInst = instructionTable + ix;
         int cmp = strcasecmp(pInst->mnemonic, pMnemonic);
-        if (cmp == 0)
-        {
+        if (cmp == 0) {
 //printf("Inst=[%02x  %4s %s,%s  %d],  found=[%d, %s, %s]\n",
 //       pInst->opcode, pInst->mnemonic, pInst->reg1, pInst->reg2, pInst->nRegs,
 //       numRegs, reg1, reg2);
             bMnemonicFound = true;
-            if (pInst->nRegs != numRegs)
-            {
+            if (pInst->nRegs != numRegs) {
                 return Failure(RET_ERROR, "Wrong number of register arguments for instruction", pMnemonic);
             }
             if ((pInst->nRegs >= 1) && (strcasecmp(pInst->reg1, reg1) != 0))  continue;
@@ -306,50 +265,41 @@ int AsmLine::ProcessInstruction()
             bytes[numBytes++] = pInst->opcode;
 
             // Process additional argument, if needed.
-            if (pInst->argType == EX_NONE)
-            {
-                if (!bSecondArg)
-                {
+            if (pInst->argType == EX_NONE) {
+                if (!bSecondArg) {
                     // If a non-register arg was not seen, the current token
                     // is the last register.  Scan past it for the EOL check.
                     scanner.Next();
                 }
             }
-            else
-            {
+            else {
                 // Instruction requires an expression argument.
                 unsigned val = EvaluateExpression();
-                if (val == EXPR_ERROR)
-                {
+                if (val == EXPR_ERROR) {
                     // Error message handled by expression.
                     return RET_ERROR;
                 }
                 bytes[numBytes++] = val & 0xff;
-                if (pInst->argType == EX_WORD)
-                {
+                if (pInst->argType == EX_WORD) {
                     bytes[numBytes++] = val >> 8;
                 }
             }
             state = ST_SUCCESS;
         }
-        else if (cmp > 0)
-        {
+        else if (cmp > 0) {
             // Mnemonics are alpha order, so stop searching.
             state = ST_NOT_FOUND;
         }
     }
 
-    if (state == ST_SUCCESS)
-    {
-        if (scanner.GetType() != Scanner::T_EOF)
-        {
+    if (state == ST_SUCCESS) {
+        if (scanner.GetType() != Scanner::T_EOF) {
             return Failure(RET_ERROR, "Additional arguments after instruction",
                            scanner.GetString());
         }
         return RET_OK;
     }
-    else if (bMnemonicFound)
-    {
+    else if (bMnemonicFound) {
         return Failure(RET_ERROR, "Wrong arguments for instruction", pMnemonic);
     }
 
@@ -362,15 +312,12 @@ int AsmLine::ProcessInstruction()
 // is interpreted as a sequence of bytes, so the string "ABC" is equivalent
 // to "A","B","C".  A single character string can be used in an expression as
 // a numeric constant, like "A" | 020H.  Single or double quotes are allowed.
-int AsmLine::StoreArgList(int size)
-{
+int AsmLine::StoreArgList(int size) {
     unsigned val;
     bool bMore = true;
 
-    while (bMore)
-    {
-        if ((scanner.GetType() == Scanner::T_STRING) && (scanner.GetLength() > 1))
-        {
+    while (bMore) {
+        if ((scanner.GetType() == Scanner::T_STRING) && (scanner.GetLength() > 1)) {
             // Strings of length greater than one are stored as a series of
             // bytes.  Single character strings may be treated as a single
             // byte or as a numeric part of a larger expression.
@@ -378,23 +325,18 @@ int AsmLine::StoreArgList(int size)
             numBytes += scanner.GetLength();
             scanner.Next();
         }
-        else
-        {
+        else {
             val = EvaluateExpression();
-            if (val == EXPR_ERROR)
-            {
+            if (val == EXPR_ERROR) {
                 // Error message provided by Evaluate.
                 return RET_ERROR;
             }
-            else
-            {
-                if (size == 1)
-                {
+            else {
+                if (size == 1) {
                     // Store a byte
                     bytes[numBytes++] = val & 0xff;
                 }
-                else
-                {
+                else {
                     // Store a word
                     bytes[numBytes++] = val & 0xff;
                     bytes[numBytes++] = val >> 8;
@@ -405,8 +347,7 @@ int AsmLine::StoreArgList(int size)
         scanner.Next();
     }
 
-    if (scanner.GetType() != Scanner::T_EOF)
-    {
+    if (scanner.GetType() != Scanner::T_EOF) {
         return Failure(RET_WARNING, "Found additonal characters after expression list:",
                        scanner.GetString());
     }
@@ -414,65 +355,52 @@ int AsmLine::StoreArgList(int size)
 }
 
 
-unsigned AsmLine::EvaluateAtom()
-{
+unsigned AsmLine::EvaluateAtom() {
     unsigned val;
 
     int t = scanner.GetType();
-    if (t == Scanner::T_ERROR)
-    {
+    if (t == Scanner::T_ERROR) {
         Failure(RET_ERROR, scanner.GetErrorMsg());
         val = EXPR_ERROR;
     }
 
-    else if (t == Scanner::T_OPEN_PAREN)
-    {
+    else if (t == Scanner::T_OPEN_PAREN) {
         scanner.Next();
         val = EvaluateExpression();
         if (val == EXPR_ERROR)  return EXPR_ERROR;
-        if (scanner.GetType() != Scanner::T_CLOSE_PAREN)
-        {
+        if (scanner.GetType() != Scanner::T_CLOSE_PAREN) {
             Failure(RET_ERROR, "Expecting close parenthesis, found", scanner.GetString());
             val = EXPR_ERROR;
         }
     }
-    else if (t == Scanner::T_DOLLAR)
-    {
+    else if (t == Scanner::T_DOLLAR) {
         val = startAddr;
     }
 
-    else if (t == Scanner::T_CONSTANT)
-    {
+    else if (t == Scanner::T_CONSTANT) {
         val = scanner.GetValue();
     }
 
-    else if (t == Scanner::T_STRING)
-    {
-        if (scanner.GetLength() == 1)
-        {
+    else if (t == Scanner::T_STRING) {
+        if (scanner.GetLength() == 1) {
             // Treat a one character string as a numeric constant, like a single
             // quoted char in C.  For example, 'A' == 65.
             val = *scanner.GetString();
         }
-        else
-        {
+        else {
             Failure(RET_ERROR, "Multi-character string not allowed in expression.");
             val = EXPR_ERROR;
         }
     }
-    else if (t == Scanner::T_IDENTIFIER)
-    {
+    else if (t == Scanner::T_IDENTIFIER) {
         // Try the symbol table.
         val = symbols.Lookup(scanner.GetString());
-        if (val == SymbolTable::NO_ENTRY)
-        {
-            if (pass > 1)
-            {
+        if (val == SymbolTable::NO_ENTRY) {
+            if (pass > 1) {
                 Failure(RET_ERROR, "Label not found", scanner.GetString());
                 val = EXPR_ERROR;
             }
-            else
-            {
+            else {
                 // Ignore the error in the first pass of assembly.  It might be
                 // a reference to a symbol that isn't defined yet.
                 val = 0;
@@ -480,8 +408,7 @@ unsigned AsmLine::EvaluateAtom()
         }
     }
 
-    else
-    {
+    else {
         Failure(RET_ERROR, "Expected label or numeric constant, found:", scanner.GetString());
         val = EXPR_ERROR;
     }
@@ -492,31 +419,25 @@ unsigned AsmLine::EvaluateAtom()
 
 
 // Parse multiplication and division
-unsigned AsmLine::EvaluateFactors()
-{
+unsigned AsmLine::EvaluateFactors() {
     unsigned num1 = EvaluateAtom();
     if (num1 == EXPR_ERROR)  return EXPR_ERROR;
-    while (scanner.GetType() == Scanner::T_FACTOR_OPER)
-    {
+    while (scanner.GetType() == Scanner::T_FACTOR_OPER) {
         int op = scanner.GetValue();
         scanner.Next();
         unsigned num2 = EvaluateAtom();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
-        if (op == Scanner::V_DIVIDE)
-        {
-            if (num2 == 0)
-            {
+        if (op == Scanner::V_DIVIDE) {
+            if (num2 == 0) {
                 Failure(RET_ERROR, "Divide by zero");
                 return EXPR_ERROR;
             }
             num1 /= num2;
         }
-        else if (op == Scanner::V_MOD)
-        {
+        else if (op == Scanner::V_MOD) {
             num1 %= num2;
         }
-        else
-        {
+        else {
             num1 *= num2;
         }
     }
@@ -526,22 +447,18 @@ unsigned AsmLine::EvaluateFactors()
 
 
 // Parse addition and subtraction
-unsigned AsmLine::EvaluateSums()
-{
+unsigned AsmLine::EvaluateSums() {
     unsigned num1 = EvaluateFactors();
     if (num1 == EXPR_ERROR)  return EXPR_ERROR;
-    while (scanner.GetType() == Scanner::T_SUM_OPER)
-    {
+    while (scanner.GetType() == Scanner::T_SUM_OPER) {
         int op = scanner.GetValue();
         scanner.Next();
         unsigned num2 = EvaluateFactors();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
-        if (op == Scanner::V_MINUS)
-        {
+        if (op == Scanner::V_MINUS) {
             num1 -= num2;
         }
-        else
-        {
+        else {
             num1 += num2;
         }
     }
@@ -550,12 +467,10 @@ unsigned AsmLine::EvaluateSums()
 
 
 // Evaluate bitwise AND expression
-unsigned AsmLine::EvaluateBitwiseAnd()
-{
+unsigned AsmLine::EvaluateBitwiseAnd() {
     unsigned num1 = EvaluateSums();
     if (num1 == EXPR_ERROR)  return EXPR_ERROR;
-    while (scanner.GetType() == Scanner::T_BIT_AND_OPER)
-    {
+    while (scanner.GetType() == Scanner::T_BIT_AND_OPER) {
         scanner.Next();
         unsigned num2 = EvaluateSums();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
@@ -567,22 +482,18 @@ unsigned AsmLine::EvaluateBitwiseAnd()
 
 
 // Evaluate bitwise OR expression
-unsigned AsmLine::EvaluateBitwiseOr()
-{
+unsigned AsmLine::EvaluateBitwiseOr() {
     unsigned num1 = EvaluateBitwiseAnd();
     if (num1 == EXPR_ERROR)  return EXPR_ERROR;
-    while (scanner.GetType() == Scanner::T_BIT_OR_OPER)
-    {
+    while (scanner.GetType() == Scanner::T_BIT_OR_OPER) {
         int op = scanner.GetValue();
         scanner.Next();
         unsigned num2 = EvaluateBitwiseAnd();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
-        if (op == Scanner::V_OR)
-        {
+        if (op == Scanner::V_OR) {
             num1 |= num2;
         }
-        else
-        {
+        else {
             num1 ^= num2;
         }
     }
@@ -591,14 +502,12 @@ unsigned AsmLine::EvaluateBitwiseOr()
 }
 
 
-unsigned AsmLine::EvaluateExpression()
-{
+unsigned AsmLine::EvaluateExpression() {
     return EvaluateBitwiseOr();
 }
 
 
-void usage()
-{
+void usage() {
     fprintf(stderr, "usage: %s [-b ssss:eeee] [-g aaaa] <file.asm>\n", "asm85");
     fprintf(stderr, "  -b  Specify an address range to output as a binary image\n");
     fprintf(stderr, "      The option for -b must be hex start and end in the form: ssss:eeee\n");
@@ -609,8 +518,7 @@ void usage()
 }
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char * argv[])
-{
+int main(int argc, char * argv[]) {
     char line[256];
     char * asmName;
     char * listName;
@@ -628,14 +536,11 @@ int main(int argc, char * argv[])
     int c;
 
     opterr = 0;
-    while ((c = getopt (argc, argv, "b:g:")) != -1)
-    {
-        switch (c)
-        {
+    while ((c = getopt (argc, argv, "b:g:")) != -1) {
+        switch (c) {
         case 'b':
             if ((strlen(optarg) != 9) || (optarg[4] != ':') ||
-                (strspn(optarg, "0123456789abcdefABCDEF:") != 9))
-            {
+                (strspn(optarg, "0123456789abcdefABCDEF:") != 9)) {
                 fprintf(stderr,
                         "option for -b must be hex start and end in the form: ssss:eeee\n");
                 usage();
@@ -643,8 +548,7 @@ int main(int argc, char * argv[])
             binAddrs[numBins++] = strdup(optarg);
             break;
         case 'g':
-            if ((strlen(optarg) != 4) || (strspn(optarg, "0123456789abcdefABCDEF") != 4))
-            {
+            if ((strlen(optarg) != 4) || (strspn(optarg, "0123456789abcdefABCDEF") != 4)) {
                 fprintf(stderr,
                         "option for -g must be hex execution address in the form: aaaa\n");
                 usage();
@@ -664,8 +568,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (optind != argc - 1)
-    {
+    if (optind != argc - 1) {
         usage();
     }
     asmName = argv[optind];
@@ -674,14 +577,12 @@ int main(int argc, char * argv[])
     // name computation a lot easier and it guards against accidentally using
     // file.hex or file.lst as the input file.
     int fileNameLen = strlen(asmName);
-    if ((fileNameLen < 5) || strcmp(asmName + fileNameLen - 4, ".asm") != 0)
-    {
+    if ((fileNameLen < 5) || strcmp(asmName + fileNameLen - 4, ".asm") != 0) {
         usage();
     }
 
     asmFile = fopen(asmName, "r");
-    if (!asmFile)
-    {
+    if (!asmFile) {
         fprintf(stderr, "Error opening file:%s\n", asmName);
         return -1;
     }
@@ -691,13 +592,11 @@ int main(int argc, char * argv[])
     strcpy(hexName + fileNameLen - 3, "hex");
 
     // Open the list file and the hex file.
-    if ((listFile = fopen(listName, "w")) == NULL)
-    {
+    if ((listFile = fopen(listName, "w")) == NULL) {
         fprintf(stderr, "Error opening file for write: %s\n", listName);
         return -1;
     }
-    if ((hexFile = fopen(hexName, "w")) == NULL)
-    {
+    if ((hexFile = fopen(hexName, "w")) == NULL) {
         fprintf(stderr, "Error opening file for write: %s\n", hexName);
         return -1;
     }
@@ -709,27 +608,22 @@ int main(int argc, char * argv[])
     int lineNum = 1;
     int errorCount = 0;
     int warningCount = 0;
-    while(fgets(line, 256, asmFile))
-    {
+    while(fgets(line, 256, asmFile)) {
         line[strcspn(line, "\r\n")] = '\0';
         int status = asmLine.Process(line, addr, 1);
-        if (status == AsmLine::RET_PASS1_ERROR)
-        {
+        if (status == AsmLine::RET_PASS1_ERROR) {
             printf("%d: ERROR - %s\n", lineNum, asmLine.GetErrorMsg());
             ++errorCount;
         }
-        else if (status == AsmLine::RET_DIR_DS)
-        {
+        else if (status == AsmLine::RET_DIR_DS) {
             addr = asmLine.GetStartAddr() + asmLine.GetAuxValue();
         }
-        else
-        {
+        else {
             addr = asmLine.GetStartAddr() + asmLine.GetNumBytes();
         }
         ++lineNum;
     }
-    if (errorCount > 0)
-    {
+    if (errorCount > 0) {
         // The listing isn't generated until the second pass.  If any errors
         // were detected that are specific to pass 1, just stop.
         printf("Errors detected in source.  No hex file created.\n");
@@ -745,8 +639,7 @@ int main(int argc, char * argv[])
     rewind(asmFile);
     addr = 0;
     lineNum = 1;
-    while (fgets(line, 256, asmFile))
-    {
+    while (fgets(line, 256, asmFile)) {
         line[strcspn(line, "\r\n")] = '\0';
         int status = asmLine.Process(line, addr, 2);
         addr = asmLine.GetStartAddr();
@@ -760,36 +653,30 @@ int main(int argc, char * argv[])
         // Note that the additional info printed (addr, bytes, lineNo) is
         // exactly 24 bytes.  This keeps the source code aligned on its 8 byte
         // tab boundaries in the list file.
-        if (status == AsmLine::RET_DIR_EQU)
-        {
+        if (status == AsmLine::RET_DIR_EQU) {
             fprintf(listFile, "(%04x)           ", asmLine.GetAuxValue());
         }
-        else if (status == AsmLine::RET_DIR_DS)
-        {
+        else if (status == AsmLine::RET_DIR_DS) {
             fprintf(listFile, "%04x +%04x       ",
                     addr, asmLine.GetAuxValue());
             addr += asmLine.GetAuxValue();
         }
-        else if (byteCount)
-        {
+        else if (byteCount) {
             fprintf(listFile, "%04x ", addr);
-            for (int ix = 0; ((ix < byteCount) && (ix < 4)); ix++)
-            {
+            for (int ix = 0; ((ix < byteCount) && (ix < 4)); ix++) {
                 fprintf(listFile, "%02x ", asmLine.GetBytes()[ix]);
             }
             if (byteCount < 4)  fprintf(listFile, "   ");
             if (byteCount < 3)  fprintf(listFile, "   ");
             if (byteCount < 2)  fprintf(listFile, "   ");
         }
-        else
-        {
+        else {
             fprintf(listFile, "                 ");
         }
 
         // Print the line and any error message.
         fprintf(listFile, "%5d: %s\n", lineNum, line);
-        switch (status)
-        {
+        switch (status) {
         case AsmLine::RET_ERROR:
             printf("%d: ERROR - %s\n", lineNum, asmLine.GetErrorMsg());
             fprintf(listFile, "ERROR - %s\n\n", asmLine.GetErrorMsg());
@@ -804,18 +691,14 @@ int main(int argc, char * argv[])
 
         // If the line created more than 4 bytes of program, print the rest
         // on additional listing lines.
-        if (byteCount > 4)
-        {
-            for (int ix = 4; (ix < byteCount); ix++)
-            {
-                if ((ix & 3) == 0)
-                {
+        if (byteCount > 4) {
+            for (int ix = 4; (ix < byteCount); ix++) {
+                if ((ix & 3) == 0) {
                     fprintf(listFile, "     ");
                 }
                 fprintf(listFile, "%02x%c", asmLine.GetBytes()[ix], ((ix & 3) == 3) ? '\n' : ' ');
             }
-            if (((byteCount - 1) & 3) != 3)
-            {
+            if (((byteCount - 1) & 3) != 3) {
                 fprintf(listFile, "\n");
             }
         }
@@ -834,21 +717,18 @@ int main(int argc, char * argv[])
     image.WriteHexFile(hexFile, goAddr);
     fclose(hexFile);
 
-    if (numBins > 0)
-    {
+    if (numBins > 0) {
         int aLen = strlen(asmName);
         binName = (char *) malloc(aLen + 6);
 
-        for (int ix = 0; (ix < numBins); ix++)
-        {
+        for (int ix = 0; (ix < numBins); ix++) {
             // From "file.asm" and address "1234:5678", make "file-1234.bin".
             strcpy(binName, asmName);
             binName[aLen - 4] = '-';
             binAddrs[ix][4] = '\0';
             strcpy(binName + aLen - 3, binAddrs[ix]);
             strcpy(binName + aLen + 1, ".bin");
-            if ((binFile = fopen(binName, "wb")) == NULL)
-            {
+            if ((binFile = fopen(binName, "wb")) == NULL) {
                 fprintf(stderr, "Error opening file for write: %s\n", binName);
                 return -1;
             }

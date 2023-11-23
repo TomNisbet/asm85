@@ -10,8 +10,7 @@
 #include <stdint.h>
 
 
-class ImageStore
-{
+class ImageStore {
 public:
     ImageStore(unsigned entries);
     unsigned GetNumEntries() { return numEntries; }
@@ -21,8 +20,7 @@ public:
     void WriteBinFile(FILE * f, uint16_t startAddr, uint16_t endAddr);
 
 private:
-    class ImageStoreEntry
-    {
+    class ImageStoreEntry {
       public:
         uint16_t    addr;
         uint8_t     value;

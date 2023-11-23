@@ -11,3 +11,4 @@ all: asm85.cpp imagestore.cpp instructions.cpp symboltable.cpp scanner.cpp
 
 clean:
 	rm -f asm85 *.o
+	rm -rf asm85.dSYM

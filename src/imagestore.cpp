@@ -9,17 +9,14 @@
 #include <string.h>
 #include <stdlib.h>
 
-ImageStore::ImageStore(unsigned entries)
-{
+ImageStore::ImageStore(unsigned entries) {
     numEntries = 0;
     maxEntries = entries;
     pStore = new ImageStoreEntry[entries + 1];
 }
 
-void ImageStore::Store(unsigned addr, uint8_t val)
-{
-    if (numEntries < maxEntries)
-    {
+void ImageStore::Store(unsigned addr, uint8_t val) {
+    if (numEntries < maxEntries) {
         pStore[numEntries].addr = addr;
         pStore[numEntries].value = val;
 
@@ -30,17 +27,14 @@ void ImageStore::Store(unsigned addr, uint8_t val)
 }
 
 
-void ImageStore::Store(unsigned addr, const uint8_t * values, unsigned numValues)
-{
-    for (unsigned ix = 0; (ix < numValues); ix++)
-    {
+void ImageStore::Store(unsigned addr, const uint8_t * values, unsigned numValues) {
+    for (unsigned ix = 0; (ix < numValues); ix++) {
         Store(addr + ix, values[ix]);
     }
 }
 
 
-void ImageStore::WriteHexFile(FILE * f, const char * goAddr)
-{
+void ImageStore::WriteHexFile(FILE * f, const char * goAddr) {
     uint16_t lineAddr;
     uint8_t lineBytes = 0;
     uint8_t checksum;
@@ -49,11 +43,9 @@ void ImageStore::WriteHexFile(FILE * f, const char * goAddr)
     const char hex[] = "0123456789ABCDEF";
     const unsigned LINE_LIMIT = 32; // 16 also common in Intel Hex format.
 
-    for (unsigned ix = 0; (ix < numEntries); ix++)
-    {
+    for (unsigned ix = 0; (ix < numEntries); ix++) {
         uint8_t val = pStore[ix].value;
-        if (lineBytes == 0)
-        {
+        if (lineBytes == 0) {
             lineAddr = pStore[ix].addr;
             checksum = 0;
             p = hexData;
@@ -64,8 +56,7 @@ void ImageStore::WriteHexFile(FILE * f, const char * goAddr)
 
         // If the next address is the start of a new block, or if this line
         // already has 16 characters, then write a Data record.
-        if ((++lineBytes >= LINE_LIMIT) || (pStore[ix+1].addr != (pStore[ix].addr + 1)))
-        {
+        if ((++lineBytes >= LINE_LIMIT) || (pStore[ix+1].addr != (pStore[ix].addr + 1))) {
             *p = '\0';
             checksum += lineBytes;
             checksum += ((lineAddr >> 8) & 0xff);
@@ -91,18 +82,14 @@ void ImageStore::WriteHexFile(FILE * f, const char * goAddr)
 }
 
 
-void ImageStore::WriteBinFile(FILE * f, uint16_t startAddr, uint16_t endAddr)
-{
+void ImageStore::WriteBinFile(FILE * f, uint16_t startAddr, uint16_t endAddr) {
     uint8_t mem[65536];
 
     memset(mem, 0xff, sizeof(mem));
-    for (unsigned ix = 0; (ix < numEntries); ix++)
-    {
+    for (unsigned ix = 0; (ix < numEntries); ix++) {
         mem[pStore[ix].addr] = pStore[ix].value;
     }
 
     size_t writeSize = endAddr - startAddr + 1;
     fwrite(mem + startAddr, 1, writeSize, f);
 }
-
-

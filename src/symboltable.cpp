@@ -9,17 +9,13 @@
 #include "symboltable.h"
 
 
-int SymbolTable::Add(const char * name, unsigned val)
-{
-    if (numEntries >= MAX_ENTRIES)
-    {
+int SymbolTable::Add(const char * name, unsigned val) {
+    if (numEntries >= MAX_ENTRIES) {
         return RET_TABLE_FULL;
     }
 
-    for (int ix = 0; (ix < numEntries); ix++)
-    {
-        if (strcasecmp(entries[ix].name, name) == 0)
-        {
+    for (int ix = 0; (ix < numEntries); ix++) {
+        if (strcasecmp(entries[ix].name, name) == 0) {
             // This symbol has already been added.
             return RET_DUPLICATE;
         }
@@ -33,12 +29,9 @@ int SymbolTable::Add(const char * name, unsigned val)
 }
 
 
-int SymbolTable::Update(const char * name, unsigned val)
-{
-    for (int ix = 0; (ix < numEntries); ix++)
-    {
-        if (strcasecmp(entries[ix].name, name) == 0)
-        {
+int SymbolTable::Update(const char * name, unsigned val) {
+    for (int ix = 0; (ix < numEntries); ix++) {
+        if (strcasecmp(entries[ix].name, name) == 0) {
             entries[ix].val = val;
             return RET_OK;
         }
@@ -48,12 +41,9 @@ int SymbolTable::Update(const char * name, unsigned val)
 }
 
 
-unsigned SymbolTable::Lookup(const char * name)
-{
-    for (int ix = 0; (ix < numEntries); ix++)
-    {
-        if (strcasecmp(entries[ix].name, name) == 0)
-        {
+unsigned SymbolTable::Lookup(const char * name) {
+    for (int ix = 0; (ix < numEntries); ix++) {
+        if (strcasecmp(entries[ix].name, name) == 0) {
             return entries[ix].val;
         }
     }
@@ -62,12 +52,8 @@ unsigned SymbolTable::Lookup(const char * name)
 }
 
 
-void SymbolTable::Dump(FILE * pFile)
-{
-    for (int ix = 0; (ix < numEntries); ix++)
-    {
+void SymbolTable::Dump(FILE * pFile) {
+    for (int ix = 0; (ix < numEntries); ix++) {
         fprintf(pFile, "%-16s: %04x (%d)\n", entries[ix].name, entries[ix].val, entries[ix].val);
     }
 }
-
-

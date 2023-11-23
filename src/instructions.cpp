@@ -6,8 +6,7 @@
 
 #include "instructions.h"
 
-InstructionEntry instructionTable[] =
-{
+InstructionEntry instructionTable[] = {
 //    Mnemonic  Reg1   Reg2   nRegs Opcode  ArgType
     { "ACI",    "",    "",    0,    0xce,   EX_BYTE },
     { "ADC",    "A",   "",    1,    0x8f,   EX_NONE },

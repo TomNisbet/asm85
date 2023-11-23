@@ -20,17 +20,15 @@
 //     mov a, m         ; two registers
 //     jmp AWAY         ; one WORD arg
 //     lxi h, SAVE      ; one register, one WORD arg
-//     mvi c, 23	; one register, one BYTE arg
+//     mvi c, 23    ; one register, one BYTE arg
 
-enum
-{
+enum {
     EX_NONE = 0,
     EX_BYTE = 1,
     EX_WORD = 2
 };
 
-typedef struct
-{
+typedef struct {
     const char *    mnemonic;   // Mnemonic name
     const char *    reg1;       // Register argument 1 name
     const char *    reg2;       // Register argument 2 name
