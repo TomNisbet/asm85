@@ -275,10 +275,10 @@ void Scanner::SkipWhite() {
 int Scanner::Failure(const char * pMsg, const char * pParam) {
     tokenType = T_ERROR;
     if (pParam) {
-        sprintf(errorMsg, "%s: %s", pMsg, pParam);
+        snprintf(errorMsg, sizeof(errorMsg), "%s: %s", pMsg, pParam);
     }
     else {
-        sprintf(errorMsg, "%s", pMsg);
+        snprintf(errorMsg, sizeof(errorMsg), "%s", pMsg);
     }
 
     return tokenType;

@@ -1,108 +1,57 @@
-sym1	equ	55
-sym2	equ	55h
-sym3 equ 1234h
-num4	equ	0110b		; Binary constant
-bah	equ	77h
-dater:  dw	1234h,5678h
-modater:db	12h  , 34hi ,56h,78h
-str:    DB	"LILY",00h
-str2:   DB	"Katie" , 80
-str3:   db	"Tom","Rox"
-bad:	db	"where is the end
-hexy:   db	"cobb\xbe\xef"
-quote:  db	"\"air\""
-quote2: db	"\"bud\"more"
-slash:  db	"\\abc"
-special:db	"\t\n\r",bah,beh, bad,sym1,sym2 
-123
-"abc"
-+
+; Test and demonstrate assembly errors
+; lines marked with ERR are detected by the assenbler
+; lines marked as *ERR should be detected, but are currently not
 
-buffer	ds	8		; Can reserve space with DS.
-char2:  mvi	a,'A'
-char3:	mvi	b,'abc'		; ERR: Can't use string in expression.
-symbol: dw str,nope,str2,65535,cafeh,sym3
-        LXI	SP,2100H
+; constants
+symd1   equ 55          ; decimal constant
+symd2   equ 5X5         ; *ERR: bad decimal constant
+symh1   equ 5A5h        ; hex constant
+symh2   equ 5A5         ; ERR: missing H for hex constant
+symh3   equ ffffH       ; ERR: hex must start with numeric
+symh4   equ 0ffffH      ; Hex with leading zero
+symb1   equ 01100110b   ; Binary constant
+symb2   equ 01101210b   ; ERR: bad binary constant
 
-VeryVeryVeryLongLabel:
-	db	"Labels can be up to 32 characters and must start with an alpha."
+bah     equ 77h
+bad:    db  "where is the end  ; ERR: unterminated string
+special:db  "\t\n\r",bah,beh, bad  ; ERR: undefined symbol
 
+; column zero
+LABEL1:                 ; label can start in column 0
+LABEL2: MOV   C,A       ; label with instruction also OK
+NAME1   EQU   7         ; name can start in column zero
+123                     ; ERR: not name or label
+"abc"                   ; ERR: not name or label
++                       ; ERR: not name or label
+mov h,l                 ; *ERR: instruction can't start in column zero
 
-single: db	"'"
-char:	db	'"'
+; extra information on line and extra/incorrect arguments
+        nop     SP      ; ERR: extra register argument
+        nop     d,e     ; ERR: multiple extra registers
+        nop     str     ; ERR: extra expression argument
+        nop     12XX    ; ERR: extra characters
+        MOV     A       ; ERR: missing second register
+        MOV     A,4     ; ERR: missing second register
+        MVI     B,A     ; ERR: second arg should be expression
+        JMP     SP      ; ERR: first arg should be expression
+        JZ              ; ERR: missing arg
 
-; Some common C-style string escapes are supported: CR, LF, tab, NULL, and
-; hex value.  Hex escapes can use upper or lower case and must be 2 digits.
-	db	"\r\n\t\x2a\x2B\0"
-
-; The backslash can also be used to escape quotes or the backslash character itself.
-	db	'\\'			; Backslash character.
-	db	'\''			; Single quote character.
-	db	"'"			; Same string using double quotes.
-	db	"A \"quoted\" string"	; Quotes within quotes.
-	db	'A "quoted" string'	; Same string using single quotes.
-	db	"mismatch'		; ERR: quotes must match.
-	
-CR	equ	13
-LF	equ	'\n'
-	db	"ABC123\r\n"
-	db	"ABC123",CR,LF
-	db	"ABC123",13,10
-	db	'A','B','C','1','2','3','\r','\n'
-	db	"ABC",31h,32h,"3",'\r',LF
-
+; RST instructions
+        RST     0       ; OK
+        RST     A       ; ERR: must be number
+RNUM    equ     1
+        RST     RNUM    ; ERR: expression not allowed
+        RST     1+1     ; ERR: expression not allowed
+        RST     7       ; OK
+        RST     9       ; ERR: RST number must be 0..7
+; characters in expressions      
+        mvi     b,'P'   ; single char is a byte
+        lxi     d,'QR'  ; two chars is a sixteen bit value
+        mvi     e,'abc' ; ERR: Can't use string in expression
+        lxi     b,'a'*'B' ; weird, but legal
 
 
-
-
-
-
-
-var6	equ	7+7*7+7/(7-7)
-var0	equ	01010111b
-
-	org $ + 08000h
-var1	equ	32
-var2	equ	$ + 1
-var3	equ	16* 3
-var4	equ	(2+3)
-stuff	ds	20
-ssize	equ	$ - stuff
-stuff2	dw	0ffffh & 01248h
-stuff3	db	var0   |05ah
-stuff4	db	"ABC"
-stuff5	db 	'a','b','c'
-stuff6	db	020H | 'A'
-stuff7	db	'B'&11011111B
-stuff8	db	"123",09H, "456", 0AH
-stuff9  db      "abc\ndef\rghi\x00\x30"
-stuff10 db      "abc\"d"
-
-var7:	db	00dh, 00ah
-var8:	equ	0
-var9:	db	"yeah, baby"
-
-
-
-        mvi     c,'T'           ; Send a test character
-        mvi     b,OUTBITS       ; Number of output bits
-        xra     a               ; Clear carry for start bit
-        mvi     a,080H          ; Set the SDE flag
-        rar                     ; Shift carry into SOD flag
-        cmc                     ;   and invert carry.  Why? (serial is inverted?)
-        sim                     ; Output data bit
-        lxi     h,BITTIME       ; Load the time delay for one bit width
-        dcr     l               ; Wait for bit time
-        jnz     CO2
-        dcr     h
-        jnz     CO2
-        stc                     ; Shift in stop bit(s)
-        mov     a,c             ; Get char to send
-        rar                     ; LSB into carry
-        mov     c,a             ; Store rotated data
-        dcr     b
-        jnz     CO1             ; Send next bit
-        ei
-        jmp     START
-
-
+; math
+var1    equ     23 / 0  ; ERR: divide by zero
+var2    dw      255 + 10; OK as a 16 bit value
+var3    db      255 + 10; *ERR: 8 bit constant overflow

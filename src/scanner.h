@@ -45,6 +45,7 @@ public:
 
     int Init(const char * ln);
     int Next();
+    void ChangeRegisterToId() { if (tokenType == T_REGISTER) tokenType = T_IDENTIFIER; }
     char PeekChar();
     int GetLength();
     int GetType() { return tokenType; }

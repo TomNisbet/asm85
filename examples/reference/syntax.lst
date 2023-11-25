@@ -1,0 +1,233 @@
+asm85 8085 Assembler v1.2 by nib
+
+                     1: ; The assembler runs two passes over the source file.  The first pass builds
+                     2: ; the symbol table and the second emits the hex file and list file.
+                     3: ;
+                     4: ; Note that the assembler is case-insensitive for instructions, directives,
+                     5: ; register names, and labels.  The labels "label2" and "LABEL2" are the same,
+                     6: ; and an error would be thrown if both were defined.
+                     7:  
+                     8: ; The ORG directive sets the current address for assembly.  A file can
+                     9: ; contain more than one ORG.  The assembler does not detect overlapping
+                    10: ; ORG directives and will silently overwrite output in that case.
+(2000)              11:         org     RAMST + 02000h
+                    12: 
+                    13: 
+                    14: ; Column one must contain whitespace or a label or a comment start.
+                    15: ; Labels can be up to 32 characters and must start with an alpha.  
+                    16: ; Numbers and the underscore character are permitted in a label.
+                    17: ; Labels end with a colon character.
+2000 7b             18: LABEL1: db      123             ; labels can be on the same line as code
+                    19: LABEL2:
+2001 f1             20:         POP     PSW             ; or the label can be before the code
+2002 d5             21: NOSPACE:push    D               ; a space is not required after a label
+                    22: VeryVeryVeryLongLabel:
+2003 4c 61 62 65    23:     db  "Labels can be up to 32 characters and must start with an alpha."
+     6c 73 20 63
+     61 6e 20 62
+     65 20 75 70
+     20 74 6f 20
+     33 32 20 63
+     68 61 72 61
+     63 74 65 72
+     73 20 61 6e
+     64 20 6d 75
+     73 74 20 73
+     74 61 72 74
+     20 77 69 74
+     68 20 61 6e
+     20 61 6c 70
+     68 61 2e 
+                    24: 
+                    25: ; The EQU directive is used to define a constant value.  It does not emit
+                    26: ; any code.  The name label for an EQU does not need the trailing but it
+                    27: ; does need to be followed by whitespace.
+(0000)              28: RAMST   equ     00000h          
+(c000)              29: ROMST   equ     0c000h         
+                    30: 
+                    31: ; Constants can be decimal, hex, or binary.  Binary is indicated with a
+                    32: ; trailing 'b' and hex with a trailing 'h' character.  All constants must
+                    33: ; start with a numeric character, so hex values starting with A-F must have
+                    34: ; a leading zero.
+(0037)              35: num0    equ     55              ; Decimal constant
+(0037)              36: num1    equ     55D             ; Decimal constant with optional suffix
+(0055)              37: num2    EQU     55h             ; Hex
+(00a6)              38: num3    equ     0a6h            ; Hex with leading zero
+(1234)              39: num4    equ     1234H           ; Hex without leading zero
+(0065)              40: num5    equ     01100101b       ; Binary
+(0cab)              41: CAB     equ     0CABh           ; Note label 'CAB' and constant '0CABh'
+                    42: 
+                    43: ; The DB directive places one or more bytes of data in the output.
+2042 05             44: d1:     db      5               ; single byte
+2043 12 34 56 78    45: d2:     db      12h,34h,56h,78h ; multiple bytes
+2047 05 2a 0b       46: d3:     db      5, 02Ah, 1011B  ; Mixed decimal, hex, and binary
+                    47: 
+                    48: ; The DB directive can also be used with strings.  Each octet in the string
+                    49: ; generates one octet of output.  Strings and numeric constants can be mixed
+                    50: ; in a single directive.
+204a 54             51: str1:   db      'T'             ; Single character constant
+204b 57 65 6c 63    52: str2:   DB      "Welcome"       ; String constant
+     6f 6d 65 
+2052 72 65 64 67    53: str3:   db      "red","green"   ; Multiple strings
+     72 65 65 6e
+205a 03 72 65 64    54: str4:   db      3,"red",4,"blue"; Mixed strings and numerics
+     04 62 6c 75
+     65 
+                    55: 
+                    56: ; Note that a single character string can also be used anywhere a numeric
+                    57: ; would be allowed.  It evaluates to the ASCII value of the single character.
+2063 0e 41          58:         mvi     c, 65           ; Move the letter 'A' into register C.
+2065 0e 41          59:         mvi     c, 041H         ; Move the letter 'A' into register C.
+2067 0e 41          60:         mvi     c, 'A'          ; Move the letter 'A' into register C.
+                    61: 
+                    62: ; A two character string can also be used anywhere a numeric would be allowed.
+                    63: ; It evaluates to the 16-bit value of ASCII value of the two characters, where
+                    64: ; the MSB is the first char and the LSB is the second.
+2069 21 42 41       65:         lxi     h,04142H        ; All of these evaluate to 4142H
+206c 21 42 41       66:         lxi     h,'AB'          ; All of these evaluate to 4142H
+206f 21 42 41       67:         lxi     h,"AB"          ; All of these evaluate to 4142H
+2072 21 42 41       68:         lxi     h,'A'*256 | 'B' ; All of these evaluate to 4142H
+                    69: 
+                    70: 
+                    71: ; Some common C-style string escapes are supported: CR, LF, tab, NULL, and
+                    72: ; hex value.  Hex escapes can use upper or lower case and must be 2 digits.
+2075 0d 0a 09 2a    73:     db  "\r\n\t\x2a\x2B\0"
+     2b 00 
+                    74: 
+                    75: ; The backslash can also be used to escape quotes or the backslash character
+                    76: ; itself.  Embedded quotes can also be handled by placing double quotes
+                    77: ; inside single quotes or single quotes inside double quotes.
+207b 5c             78:     db  '\\'                    ; Backslash character.
+207c 27             79:     db  '\''                    ; Single quote character.
+207d 27             80:     db  "'"                     ; Same string using double quotes.
+207e 41 20 22 71    81:     db  "A \"quoted\" string"   ; Quotes within quotes.
+     75 6f 74 65
+     64 22 20 73
+     74 72 69 6e
+     67 
+208f 41 20 22 71    82:     db  'A "quoted" string'     ; Same string using single quotes.
+     75 6f 74 65
+     64 22 20 73
+     74 72 69 6e
+     67 
+20a0 54 68 69 73    83:     db  "This isn't bad"        ; Single quote in double quotes.
+     20 69 73 6e
+     27 74 20 62
+     61 64 
+                    84:     
+                    85: ; The following DBs are all equivalent  
+(000d)              86: CR  equ 13
+(000a)              87: LF  equ '\n'
+20ae 41 42 43 31    88:     db  "ABC123\r\n"
+     32 33 0d 0a
+20b6 41 42 43 31    89:     db  "ABC123",CR,LF
+     32 33 0d 0a
+20be 41 42 43 31    90:     db  "ABC123",13,10
+     32 33 0d 0a
+20c6 41 42 43 31    91:     db  'A','B','C','1','2','3','\r','\n'
+     32 33 0d 0a
+20ce 41 42 43 31    92:     db  "ABC",31h,32h,"3",'\r',LF
+     32 33 0d 0a
+                    93: 
+                    94: ; The DW directive stores one or more 16 bit values.
+20d6 03 02          95: words1: dw      0203h           ; One word value in hex
+20d8 34 12          96: words2: dw      num4            ; One word value in decimal
+20da 55 aa          97: words3: dw      1010101001010101B ; One word value in binary
+20dc 02 00 03 00    98: words4: dw      02h, 03h        ; Two word values
+20e0 02 00 03 00    99: words5: dw      02h, 03, 04ffh  ; Three word values
+     ff 04 
+                   100: 
+                   101: ; Note that DW stores the two octet values in intel (little endian) order, so
+                   102: ; the following two declarations are equivalent:
+20e6 34 12         103:         dw      01234h
+20e8 34 12         104:         db      034h, 012h
+                   105: 
+                   106: ; The DS directive reserves space, but does not generate any output.  It
+                   107: ; simply advances the target address for the next code or data.
+(0020)             108: StrSize equ     32
+20ea +0080         109: buffer: ds  StrSize * 4     ; Reserve space for 4 strings
+                   110: 
+                   111: ; Expressions can be used in place of any numeric constant.
+216a 00 0c         112: t:      dw      1024 * 3
+216c 31 82 00      113:         LXI     SP, 32 * 4 + 2
+216f 21 5f 20      114:         lxi     h, str4 + 5
+2172 11 0a 21      115:         lxi     d, buffer + StrSize
+2175 39            116:         db      7+7*7+7/(7+7-7)
+2176 0e 61         117:         mvi     c, 'A' | 020H
+2178 0e 41         118:         mvi     c, 'a' & 11011111b
+                   119: 
+                   120: ; The $ symbol is used in an expression to represent the current address.
+                   121: ; This is useful for calculating the size of objects
+217a 48 65 6c 6c   122: hello:  db  "Hello, world"
+     6f 2c 20 77
+     6f 72 6c 64
+(000c)             123: strLen  equ     $ - hello       ; Length of the string
+                   124: 
+                   125: jump_tab:                       ; Jump table.  Each entry is 3 octets.
+2186 61            126:         db      'a'             ; ADD command
+2187 00 01         127:         dw      0100h           ; Handler address
+2189 65            128:         db      'e'             ; EXAMINE command
+218a 42 01         129:         dw      0142h
+218c 70            130:         db      'p'             ; PRINT command
+218d 20 02         131:         dw      0220h
+218f 73            132:         db      's'             ; STEP command
+2190 34 03         133:         dw      0334h
+2192 78            134:         db      'x'             ; EXIT command
+2193 34 04         135:         dw      0434h
+(0005)             136: entries equ     ($-jump_tab) / 3 ; Number of entries in the table
+                   137: 
+                   138: 
+                   139: ; It is legal, though probably not wise, to have a label with the same name
+                   140: ; as a register.  This looks confusing, but it will work.  All of the examples
+                   141: ; below load register pair HL with the address of the word at label "SP".  None
+                   142: ; of these have any relation to the SP register.
+2195 00 01         143: SP:     dw      256             ; define a word at location named SP
+2197 21 95 21      144:         LXI     H,SP            ; laod address of "SP" word into HL pair
+219a 21 95 21      145:         LXI     H,SP+0
+219d 21 95 21      146:         LXI     H,0+SP
+                   147: 
+                   148: 
+
+148 lines, 0 errors, 0 warnings
+
+
+SYMBOL TABLE:
+
+LABEL1          : 2000 (8192)
+LABEL2          : 2001 (8193)
+NOSPACE         : 2002 (8194)
+VeryVeryVeryLongLabel: 2003 (8195)
+RAMST           : 0000 (0)
+ROMST           : c000 (49152)
+num0            : 0037 (55)
+num1            : 0037 (55)
+num2            : 0055 (85)
+num3            : 00a6 (166)
+num4            : 1234 (4660)
+num5            : 0065 (101)
+CAB             : 0cab (3243)
+d1              : 2042 (8258)
+d2              : 2043 (8259)
+d3              : 2047 (8263)
+str1            : 204a (8266)
+str2            : 204b (8267)
+str3            : 2052 (8274)
+str4            : 205a (8282)
+CR              : 000d (13)
+LF              : 000a (10)
+words1          : 20d6 (8406)
+words2          : 20d8 (8408)
+words3          : 20da (8410)
+words4          : 20dc (8412)
+words5          : 20e0 (8416)
+StrSize         : 0020 (32)
+buffer          : 20ea (8426)
+t               : 216a (8554)
+hello           : 217a (8570)
+strLen          : 000c (12)
+jump_tab        : 2186 (8582)
+entries         : 0005 (5)
+SP              : 2195 (8597)
+
+
+Total memory is 288 bytes

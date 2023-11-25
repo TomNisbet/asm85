@@ -20,6 +20,7 @@ SymbolTable symbols;
 
 extern InstructionEntry instructionTable[];
 
+const char * version = "1.2";
 
 ////////////////////////////////////////////////////////////////////////////////
 class AsmLine {
@@ -104,7 +105,6 @@ int AsmLine::Process(const char * line, uint16_t addr, int ps) {
         pMnemonic = strdup(scanner.GetString());
         scanner.Next();
     }
-//    else if ((t != Scanner::T_EOF) && (t != Scanner::T_ERROR))
     else if (t == Scanner::T_ERROR) {
         return Failure(RET_ERROR, scanner.GetErrorMsg());
     }
@@ -131,10 +131,10 @@ int AsmLine::Process(const char * line, uint16_t addr, int ps) {
 
 int AsmLine::Failure(int status, const char * pMsg, const char * pParam) {
     if (pParam) {
-        sprintf(errorMsg, "%s: %s", pMsg, pParam);
+        snprintf(errorMsg, sizeof(errorMsg), "%s: %s", pMsg, pParam);
     }
     else {
-        sprintf(errorMsg, "%s", pMsg);
+        snprintf(errorMsg, sizeof(errorMsg), "%s", pMsg);
     }
 
     return status;
@@ -207,7 +207,6 @@ int AsmLine::ProcessDirective() {
 int AsmLine::ProcessInstruction() {
     enum { ST_SEARCHING, ST_NOT_FOUND, ST_SUCCESS } state = ST_SEARCHING;
     bool bMnemonicFound = false;
-    bool bSecondArg = false;
     int numRegs = 0;
     char reg1[4];
     char reg2[4];
@@ -234,22 +233,20 @@ int AsmLine::ProcessInstruction() {
         strcpy(reg1, scanner.GetString());
         ++numRegs;
         if (scanner.PeekChar() == ',') {
-            // If the next token is a comma, then a second argument is
-            // present that may be a register or the start of an expression.
+            // If the next token is a comma, then a second argument is present that may
+            // be a register or the start of an expression.  This must be done with a Peek,
+            // because it is possible that the first register name is actually an identifier
+            // that is starting an expression, like "PSW * 2".
             scanner.Next(); // Get the comma
             scanner.Next(); // Register or start of expr
             if (scanner.GetType() == Scanner::T_REGISTER) {
                 strcpy(reg2, scanner.GetString());
                 ++numRegs;
             }
-            else {
-                // Take note of the second, non-register arg for error check.
-                bSecondArg = true;
-            }
         }
     }
 
-    for (int ix = 0; (state == ST_SEARCHING); ix++) {
+    for (int ix = 0; state == ST_SEARCHING; ix++) {
         InstructionEntry * pInst = instructionTable + ix;
         int cmp = strcasecmp(pInst->mnemonic, pMnemonic);
         if (cmp == 0) {
@@ -257,22 +254,23 @@ int AsmLine::ProcessInstruction() {
 //       pInst->opcode, pInst->mnemonic, pInst->reg1, pInst->reg2, pInst->nRegs,
 //       numRegs, reg1, reg2);
             bMnemonicFound = true;
-            if (pInst->nRegs != numRegs) {
+            if ((pInst->nRegs == numRegs - 1) && (pInst->argType != EX_NONE)) {
+                // A bit of a special case: if there are one too many register arguments and
+                // the instruction is expecting a non-register argument, then treat the
+                // current token as an identifier name instead.  Otherwise a label named 'SP'
+                // could be defined and "0 + SP" would be legal but "SP + 0" would not.
+                scanner.ChangeRegisterToId();
+                --numRegs;
+            } else if (pInst->nRegs != numRegs) {
                 return Failure(RET_ERROR, "Wrong number of register arguments for instruction", pMnemonic);
             }
+            // Found the correct mnemonic, now match the specific version if register aguments are present.
             if ((pInst->nRegs >= 1) && (strcasecmp(pInst->reg1, reg1) != 0))  continue;
             if ((pInst->nRegs == 2) && (strcasecmp(pInst->reg2, reg2) != 0))  continue;
             bytes[numBytes++] = pInst->opcode;
 
             // Process additional argument, if needed.
-            if (pInst->argType == EX_NONE) {
-                if (!bSecondArg) {
-                    // If a non-register arg was not seen, the current token
-                    // is the last register.  Scan past it for the EOL check.
-                    scanner.Next();
-                }
-            }
-            else {
+            if (pInst->argType != EX_NONE) {
                 // Instruction requires an expression argument.
                 unsigned val = EvaluateExpression();
                 if (val == EXPR_ERROR) {
@@ -283,10 +281,12 @@ int AsmLine::ProcessInstruction() {
                 if (pInst->argType == EX_WORD) {
                     bytes[numBytes++] = val >> 8;
                 }
+            } else if (scanner.GetType() == Scanner::T_REGISTER) {
+                // Scan past the valid register argument for the EOF check.
+                scanner.Next();
             }
             state = ST_SUCCESS;
-        }
-        else if (cmp > 0) {
+        } else if (cmp > 0) {
             // Mnemonics are alpha order, so stop searching.
             state = ST_NOT_FOUND;
         }
@@ -298,8 +298,7 @@ int AsmLine::ProcessInstruction() {
                            scanner.GetString());
         }
         return RET_OK;
-    }
-    else if (bMnemonicFound) {
+    } else if (bMnemonicFound) {
         return Failure(RET_ERROR, "Wrong arguments for instruction", pMnemonic);
     }
 
@@ -387,13 +386,21 @@ unsigned AsmLine::EvaluateAtom() {
             // quoted char in C.  For example, 'A' == 65.
             val = *scanner.GetString();
         }
+        else if (scanner.GetLength() == 2) {
+            // Treat a two character string as a 16 bit numeric constant.
+            // For example, 'AB' == 0x4142.  This seems a bit odd, but has
+            // been seen in some code as a quick way to reference a pair
+            // of characters.
+            val = (scanner.GetString()[0] << 8) | scanner.GetString()[1];
+        }
         else {
             Failure(RET_ERROR, "Multi-character string not allowed in expression.");
             val = EXPR_ERROR;
         }
     }
-    else if (t == Scanner::T_IDENTIFIER) {
-        // Try the symbol table.
+    else if ((t == Scanner::T_IDENTIFIER) || (t == Scanner::T_REGISTER)) {
+        // A register will never appear in an expression, so assume it is an identifier with
+        // the same name as a register and try to look it up in the symbol table.
         val = symbols.Lookup(scanner.GetString());
         if (val == SymbolTable::NO_ENTRY) {
             if (pass > 1) {
@@ -514,6 +521,7 @@ void usage() {
     fprintf(stderr, "      Multiple -b options can be specified.  Each one will create a binary file.\n");
     fprintf(stderr, "  -g  Specify a go address for the image to be wrtten the HEX file.\n");
     fprintf(stderr, "      The option for -g must be 4-digit hex address\n");
+    fprintf(stderr, "  -v  Print version and exit.\n");
     exit(-1);
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -536,7 +544,7 @@ int main(int argc, char * argv[]) {
     int c;
 
     opterr = 0;
-    while ((c = getopt (argc, argv, "b:g:")) != -1) {
+    while ((c = getopt (argc, argv, "b:g:v")) != -1) {
         switch (c) {
         case 'b':
             if ((strlen(optarg) != 9) || (optarg[4] != ':') ||
@@ -555,6 +563,9 @@ int main(int argc, char * argv[]) {
             }
             goAddr = strdup(optarg);
             break;
+        case 'v':
+            printf("asm85 8085 Assembler v%s by nib\n\n", version);
+            exit(0);
         case '?':
             if (optopt == 'b')
                 fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -600,7 +611,7 @@ int main(int argc, char * argv[]) {
         fprintf(stderr, "Error opening file for write: %s\n", hexName);
         return -1;
     }
-    fprintf(listFile, "asm85 8085 Assembler by nib\n\n");
+    fprintf(listFile, "asm85 8085 Assembler v%s by nib\n\n", version);
 
     // Pass 1.  Send all error output to stdout.
     // Compute addresses and store all labels in the symbol table.
