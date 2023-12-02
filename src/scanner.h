@@ -26,13 +26,20 @@ public:
         T_DOLLAR,
         T_OPEN_PAREN,
         T_CLOSE_PAREN,
-        T_BIT_OR_OPER,
-        T_BIT_AND_OPER,
+        T_BIT_NOT_OPER,
+        T_ISOLATE_OPER,
+        T_FACTOR_OPER,
         T_SUM_OPER,
-        T_FACTOR_OPER
+        T_RELATE_OPER,
+        T_BIT_AND_OPER,
+        T_BIT_OR_OPER,
+        T_LOGIC_NOT_OPER,
+        T_LOGIC_AND_OPER,
+        T_LOGIC_OR_OPER
     };
 
     enum {
+        V_NONE,
         V_OR,
         V_XOR,
         V_AND,
@@ -40,7 +47,19 @@ public:
         V_MINUS,
         V_MULTIPLY,
         V_DIVIDE,
-        V_MOD
+        V_MOD,
+        V_SHL,
+        V_SHR,
+        V_NAME,
+        V_LABEL,
+        V_EQ,
+        V_NE,
+        V_GE,
+        V_GT,
+        V_LE,
+        V_LT,
+        V_HIGH,
+        V_LOW
     };
 
     int Init(const char * ln);

@@ -73,6 +73,7 @@ int Scanner::Next() {
     }
 
     else {
+        bool twochar = false;
         tokenValue = 0;
         switch (*pCursor) {
         case ';':   tokenType = T_EOF;                                  break;
@@ -89,6 +90,22 @@ int Scanner::Next() {
         case '*':   tokenType = T_FACTOR_OPER;  tokenValue = V_MULTIPLY;break;
         case '/':   tokenType = T_FACTOR_OPER;  tokenValue = V_DIVIDE;  break;
         case '%':   tokenType = T_FACTOR_OPER;  tokenValue = V_MOD;     break;
+        case '~':   tokenType = T_BIT_NOT_OPER; tokenValue = V_MOD;     break;
+        case '=':   tokenType = T_RELATE_OPER;  tokenValue = V_EQ;      break;
+        case '<':
+            if (pCursor[1] == '<') {
+                tokenType = T_FACTOR_OPER;  
+                tokenValue = V_SHL;
+                twochar = true;
+            }
+            break;
+        case '>':
+            if (pCursor[1] == '>') {
+                tokenType = T_FACTOR_OPER;  
+                tokenValue = V_SHR;
+                twochar = true;
+            }
+            break;
         default:
             tokenType = T_ERROR;
             Failure("Illegal character", pCursor);
@@ -96,7 +113,12 @@ int Scanner::Next() {
 
         // Store the character as the string and skip to next character.
         tokenStr[0] = *pCursor++;
-        tokenStr[1] = '\0';
+        if (twochar) {
+            tokenStr[1] = *pCursor++;
+            tokenStr[2] = '\0';
+        } else {
+            tokenStr[1] = '\0';
+        }
     }
 
 //    printf("Next: token=%2d  value=%04x (%5d)  str=%s\n",
@@ -135,14 +157,95 @@ int Scanner::ScanIdentifier() {
     *p = '\0';
 
     // Check to see if the string is a reserved register name.
-    if (((tokenStr[1] == '\0') && (strchr("ABCDEHLM", toupper(tokenStr[0])) != NULL)) ||
+    tokenValue = V_NONE;
+    char c0 = toupper(tokenStr[0]);
+    char c1 = toupper(tokenStr[1]);
+    char c2 = toupper(tokenStr[2]);
+    if (((c1 == '\0') && (strchr("ABCDEHLM", c0) != NULL)) ||
         (strcasecmp(tokenStr, "SP") == 0) || (strcasecmp(tokenStr, "PSW") == 0)) {
         tokenType = T_REGISTER;
+        return tokenType;
     }
-    else {
-        tokenType = T_IDENTIFIER;
+    
+    // Default to IDENTIFIER, but check for reserved operators
+    tokenType = T_IDENTIFIER;
+    // AND, EQ, GE, GT, HIGH, LE, LT, LOW, MOD, NE, NOT, OR, SHL, SHR, XOR
+    switch (c0) {
+        case 'A':
+            if ((c1 == 'N') && (c2 == 'D') && (tokenStr[3] == '\0')) {
+                tokenType = T_LOGIC_AND_OPER;
+            }
+            break;
+        case 'E':
+            if ((c1 == 'Q') && (c2 == '\0')) {
+                tokenType = T_RELATE_OPER;
+                tokenValue = V_EQ;
+            }
+            break;
+        case 'G':
+            if ((c1 == 'E') && (c2 == '\0')) {
+                tokenType = T_RELATE_OPER;
+                tokenValue = V_GE;
+            } else if ((c1 == 'T') && (c2 == '\0')) {
+                tokenType = T_RELATE_OPER;
+                tokenValue = V_GT;
+            }
+            break;
+        case 'H':
+            if ((c1 == 'I') && (c2 == 'G') && (tokenStr[3] == 'H') && (tokenStr[4] == '\0')) {
+                tokenType = T_ISOLATE_OPER;
+                tokenValue = V_HIGH;
+            }
+            break;
+        case 'L':
+            if ((c1 == 'E') && (c2 == '\0')) {
+                tokenType = T_RELATE_OPER;
+                tokenValue = V_LE;
+            } else if ((c1 == 'T') && (c2 == '\0')) {
+                tokenType = T_RELATE_OPER;
+                tokenValue = V_LT;
+            } else  if ((c1 == 'O') && (c2 == 'W') && (tokenStr[3] == '\0')) {
+                tokenType = T_ISOLATE_OPER;
+                tokenValue = V_LOW;
+            }
+            break;
+        case 'M':
+            if ((c1 == 'O') && (c2 == 'D') && (tokenStr[3] == '\0')) {
+                tokenType = T_FACTOR_OPER;
+                tokenValue = V_MOD;
+            }
+            break;
+        case 'N':
+            if ((c1 == 'E') && (c2 == '\0')) {
+                tokenType = T_RELATE_OPER;
+                tokenValue = V_NE;
+            } else if ((c1 == 'O') && (c2 == 'T') && (tokenStr[3] == '\0')) {
+                tokenType = T_LOGIC_NOT_OPER;
+            }
+            break;
+        case 'O':
+            if ((c1 == 'R') && (c2 == '\0')) {
+                tokenType = T_LOGIC_OR_OPER;
+                tokenValue = V_OR;
+            }
+            break;
+        case 'S':
+            if ((c1 == 'H') && (c2 == 'L') && (tokenStr[3] == '\0')) {
+                tokenType = T_FACTOR_OPER;
+                tokenValue = V_SHL;
+            } else if ((c1 == 'H') && (c2 == 'R') && (tokenStr[3] == '\0')) {
+                tokenType = T_FACTOR_OPER;
+                tokenValue = V_SHR;
+            }
+            break;
+        case 'X':
+            if ((c1 == 'O') && (c2 == 'R') && (tokenStr[3] == '\0')) {
+                tokenType = T_LOGIC_OR_OPER;
+                tokenValue = V_XOR;
+            }
+            break;
     }
-    tokenValue = 0;
+    
     return tokenType;
 }
 

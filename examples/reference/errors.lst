@@ -71,40 +71,44 @@ ERROR - Label not found: SP
 0009 ca             37:         JZ              ; ERR: missing arg
 ERROR - Expected label or numeric constant, found:: ;
 
-                    38: 
-                    39: ; RST instructions
-000a c7             40:         RST     0       ; OK
-                    41:         RST     A       ; ERR: must be number
+000a 06             38:         MVI     b,1+2+  ; *ERR: extra chars in expression
+ERROR - Expected label or numeric constant, found:: ;
+
+                    39: 
+                    40: ; RST instructions
+000b c7             41:         RST     0       ; OK
+                    42:         RST     A       ; ERR: must be number
 ERROR - RST instruction argument must be 0-7: A
 
-(0001)              42: RNUM    equ     1
-                    43:         RST     RNUM    ; ERR: expression not allowed
+(0001)              43: RNUM    equ     1
+                    44:         RST     RNUM    ; ERR: expression not allowed
 ERROR - RST instruction argument must be 0-7: RNUM
 
-000b cf             44:         RST     1+1     ; ERR: expression not allowed
+000c cf             45:         RST     1+1     ; ERR: expression not allowed
 ERROR - Found extra arguments after RST instruction:: +
 
-000c ff             45:         RST     7       ; OK
-                    46:         RST     9       ; ERR: RST number must be 0..7
+000d ff             46:         RST     7       ; OK
+                    47:         RST     9       ; ERR: RST number must be 0..7
 ERROR - RST instruction argument must be 0-7: 9
 
-                    47: ; characters in expressions      
-000d 06 50          48:         mvi     b,'P'   ; single char is a byte
-000f 11 52 51       49:         lxi     d,'QR'  ; two chars is a sixteen bit value
-0012 1e             50:         mvi     e,'abc' ; ERR: Can't use string in expression
+                    48: 
+                    49: ; characters in expressions      
+000e 06 50          50:         mvi     b,'P'   ; single char is a byte
+0010 11 52 51       51:         lxi     d,'QR'  ; two chars is a sixteen bit value
+0013 1e             52:         mvi     e,'abc' ; ERR: Can't use string in expression
 ERROR - Multi-character string not allowed in expression.
 
-0013 01 02 19       51:         lxi     b,'a'*'B' ; weird, but legal
-                    52: 
-                    53: 
-                    54: ; math
-                    55: var1    equ     23 / 0  ; ERR: divide by zero
+0014 01 02 19       53:         lxi     b,'a'*'B' ; weird, but legal
+                    54: 
+                    55: 
+                    56: ; math
+                    57: var1    equ     23 / 0  ; ERR: divide by zero
 ERROR - Divide by zero
 
-0016 09 01          56: var2    dw      255 + 10; OK as a 16 bit value
-0018 09             57: var3    db      255 + 10; *ERR: 8 bit constant overflow
+0017 09 01          58: var2    dw      255 + 10; OK as a 16 bit value
+0019 09             59: var3    db      255 + 10; *ERR: 8 bit constant overflow
 
-57 lines, 23 errors, 0 warnings
+59 lines, 24 errors, 0 warnings
 
 
 SYMBOL TABLE:
@@ -125,9 +129,9 @@ LABEL2          : 0006 (6)
 NAME1           : 0007 (7)
 mov             : 0007 (7)
 RNUM            : 0001 (1)
-var1            : 001b (27)
-var2            : 001b (27)
-var3            : 001d (29)
+var1            : 001c (28)
+var2            : 001c (28)
+var3            : 001e (30)
 
 
-Total memory is 25 bytes
+Total memory is 26 bytes

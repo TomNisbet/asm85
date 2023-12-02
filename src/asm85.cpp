@@ -20,7 +20,7 @@ SymbolTable symbols;
 
 extern InstructionEntry instructionTable[];
 
-const char * version = "1.2";
+const char * version = "1.5";
 
 ////////////////////////////////////////////////////////////////////////////////
 class AsmLine {
@@ -70,8 +70,11 @@ class AsmLine {
     unsigned EvaluateAtom();
     unsigned EvaluateFactors();
     unsigned EvaluateSums();
+    unsigned EvaluateRelationals();
     unsigned EvaluateBitwiseAnd();
     unsigned EvaluateBitwiseOr();
+    unsigned EvaluateLogicalAnd();
+    unsigned EvaluateLogicalOr();
     unsigned EvaluateExpression();
 };
 
@@ -347,7 +350,7 @@ int AsmLine::StoreArgList(int size) {
     }
 
     if (scanner.GetType() != Scanner::T_EOF) {
-        return Failure(RET_WARNING, "Found additonal characters after expression list:",
+        return Failure(RET_WARNING, "Found additional characters after expression list:",
                        scanner.GetString());
     }
     return RET_OK;
@@ -380,6 +383,37 @@ unsigned AsmLine::EvaluateAtom() {
         val = scanner.GetValue();
     }
 
+    else if (t == Scanner::T_SUM_OPER) {
+        if (scanner.GetValue() == Scanner::V_MINUS) {
+            scanner.Next();
+            return -EvaluateAtom();
+        } else if (scanner.GetValue() == Scanner::V_PLUS) {
+            scanner.Next();
+            return EvaluateAtom();
+        } else {
+            Failure(RET_ERROR, "Expecting + or -, found", scanner.GetString());
+            val = EXPR_ERROR;
+        }
+    }
+
+    else if (t == Scanner::T_BIT_NOT_OPER) {
+        scanner.Next();
+        return ~EvaluateAtom();
+    }
+
+    else if (t == Scanner::T_ISOLATE_OPER) {
+        int op = scanner.GetValue();
+        scanner.Next();
+        val = EvaluateAtom();
+        return (op == Scanner::V_HIGH) ? (val >> 8) & 0xff : val & 0xff;
+    }
+
+    else if (t == Scanner::T_LOGIC_NOT_OPER) {
+        scanner.Next();
+        val = EvaluateRelationals();
+        return (val & 0x01) ^ 0x01;  // Invert and return only the last bit
+    }
+
     else if (t == Scanner::T_STRING) {
         if (scanner.GetLength() == 1) {
             // Treat a one character string as a numeric constant, like a single
@@ -398,6 +432,7 @@ unsigned AsmLine::EvaluateAtom() {
             val = EXPR_ERROR;
         }
     }
+
     else if ((t == Scanner::T_IDENTIFIER) || (t == Scanner::T_REGISTER)) {
         // A register will never appear in an expression, so assume it is an identifier with
         // the same name as a register and try to look it up in the symbol table.
@@ -432,20 +467,31 @@ unsigned AsmLine::EvaluateFactors() {
     while (scanner.GetType() == Scanner::T_FACTOR_OPER) {
         int op = scanner.GetValue();
         scanner.Next();
-        unsigned num2 = EvaluateAtom();
+        // Don't compute with any bits that may have overflowed out of the lower 16.
+        //  This would cause problems with division and shift right operations.
+        num1 &= 0xffff;
+        unsigned num2 = EvaluateAtom() & 0xffff;
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
-        if (op == Scanner::V_DIVIDE) {
+        switch (op) {
+        case Scanner::V_MULTIPLY:
+            num1 *= num2;
+            break;
+        case Scanner::V_DIVIDE:
             if (num2 == 0) {
                 Failure(RET_ERROR, "Divide by zero");
                 return EXPR_ERROR;
             }
             num1 /= num2;
-        }
-        else if (op == Scanner::V_MOD) {
+            break;
+        case Scanner::V_MOD:
             num1 %= num2;
-        }
-        else {
-            num1 *= num2;
+            break;
+        case Scanner::V_SHL:
+            num1 <<= num2;
+            break;
+        case Scanner::V_SHR:
+            num1 >>= num2;
+            break;
         }
     }
 
@@ -473,13 +519,40 @@ unsigned AsmLine::EvaluateSums() {
 }
 
 
+// Parse addition and subtraction
+unsigned AsmLine::EvaluateRelationals() {
+    bool result = false;
+    unsigned num1 = EvaluateSums();
+    if (num1 == EXPR_ERROR)  return EXPR_ERROR;
+    if (scanner.GetType() != Scanner::T_RELATE_OPER) {
+        return num1;
+    } else {
+        int op = scanner.GetValue();
+        scanner.Next();
+        // Don't compare any bits that may have overflowed out of the lower 16.
+        num1 &= 0xffff;
+        unsigned num2 = EvaluateSums() & 0xffff;
+        if (num2 == EXPR_ERROR)  return EXPR_ERROR;
+        switch (op) {
+            case Scanner::V_EQ: result = (num1 == num2); break;
+            case Scanner::V_GE: result = (num1 >= num2); break;
+            case Scanner::V_GT: result = (num1 >  num2); break;
+            case Scanner::V_LE: result = (num1 <= num2); break;
+            case Scanner::V_LT: result = (num1 <  num2); break;
+            case Scanner::V_NE: result = (num1 != num2); break;
+        }
+    }
+    return result ? 0xff : 0;
+}
+
+
 // Evaluate bitwise AND expression
 unsigned AsmLine::EvaluateBitwiseAnd() {
-    unsigned num1 = EvaluateSums();
+    unsigned num1 = EvaluateRelationals();
     if (num1 == EXPR_ERROR)  return EXPR_ERROR;
     while (scanner.GetType() == Scanner::T_BIT_AND_OPER) {
         scanner.Next();
-        unsigned num2 = EvaluateSums();
+        unsigned num2 = EvaluateRelationals();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
         num1 &= num2;
     }
@@ -501,7 +574,7 @@ unsigned AsmLine::EvaluateBitwiseOr() {
             num1 |= num2;
         }
         else {
-            num1 ^= num2;
+            num1 = num1 ^= num2;
         }
     }
 
@@ -509,8 +582,51 @@ unsigned AsmLine::EvaluateBitwiseOr() {
 }
 
 
+// Evaluate bitwise AND expression
+unsigned AsmLine::EvaluateLogicalAnd() {
+    unsigned num1 = EvaluateBitwiseOr();
+    if (num1 == EXPR_ERROR)  return EXPR_ERROR;
+    while (scanner.GetType() == Scanner::T_LOGIC_AND_OPER) {
+        scanner.Next();
+        unsigned num2 = EvaluateBitwiseOr();
+        if (num2 == EXPR_ERROR)  return EXPR_ERROR;
+        // logical operators only check the last bit
+        num1 = (num1 & num2 & 0x01);
+    }
+
+    return num1;
+}
+
+
+// Evaluate bitwise AND expression
+unsigned AsmLine::EvaluateLogicalOr() {
+    unsigned num1 = EvaluateLogicalAnd();
+    if (num1 == EXPR_ERROR)  return EXPR_ERROR;
+    while (scanner.GetType() == Scanner::T_LOGIC_OR_OPER) {
+        int op = scanner.GetValue();
+        scanner.Next();
+        unsigned num2 = EvaluateLogicalAnd();
+        if (num2 == EXPR_ERROR)  return EXPR_ERROR;
+        // logical operators only check the last bit
+        if (op == Scanner::V_OR) {
+            num1 = ((num1 | num2) & 0x01);
+        } else {
+            num1 = ((num1 ^ num2) & 0x01);
+        }
+    }
+
+    return num1;
+}
+
+
+// Note that all expression evaluation works with 16 bit values, but these routines return a
+// native unsigned, which is likely to be 32 bits or more.  The larger value is used to indicate
+// an error condition.  In most cases, the larger storage does not cause an issue, but there is
+// code to ignore the upper bits for some operations, like compare and division.
+// A beter solution might be to refactor the code to use exception handling, but that may be done
+// most effectively at the Scanner, so it would require code changes far beyond the expression parsing.
 unsigned AsmLine::EvaluateExpression() {
-    return EvaluateBitwiseOr();
+    return EvaluateLogicalOr();
 }
 
 

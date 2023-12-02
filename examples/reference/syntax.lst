@@ -156,39 +156,150 @@ asm85 8085 Assembler v1.2 by nib
 2176 0e 61         117:         mvi     c, 'A' | 020H
 2178 0e 41         118:         mvi     c, 'a' & 11011111b
                    119: 
-                   120: ; The $ symbol is used in an expression to represent the current address.
-                   121: ; This is useful for calculating the size of objects
-217a 48 65 6c 6c   122: hello:  db  "Hello, world"
+                   120: ; Operators and precedence
+                   121: PREC:
+217a 0f 00         122:         dw      (8+7)           ; Parenthesis hve highest precedence
+217c ff ff         123:         dw      -1              ; bitwise NOT, unary plus and minus
+217e 02            124:         db      HIGH 512        ; byte isolation: HIGH, LOW
+217f 02 00         125:         dw      100 / 10 MOD 4  ; multiply, divide, SHL, SHR, MOD - left to right
+2181 09 00         126:         dw      2 + 8 - 1       ; add, subtract, unary plus, minus - left to right
+2183 ff 00         127:         dw      2 LE 3          ; relational: EQ, NE, GT, GE, LT, LE =
+2185 03 00         128:         dw      23H & 0FH       ; bitwise AND (extension to Intel Assembler)
+2187 d0 00         129:         dw      23H | 0FH ^0FFH ; bitwise OR and XOR (extension to Intel Assembler)
+2189 01 00         130:         dw      NOT 0           ; logicat NOT
+218b 00 00         131:         dw      1 AND 0         ; logical AND
+218d 01 00         132:         dw      1 XOR 0         ; logical OR and XOR
+                   133: 
+                   134: ; The precedence rules above have a few differences from those listed in the Intel
+                   135: ; Assembler manual.
+                   136: ; Intel85 has unary - at the same level as addition and subtraction, but asm85
+                   137: ; evaluates the unary before most other operations.  The asm85 produces the more
+                   138: ; intuitive result.
+                   139: ; In the expression below, asm85 shifts the all-ones -1 to the right.  Intel85
+                   140: ; would shift 1 to the right, producing zero, and then negate that.
+218f ff 1f         141:         dw      -1 SHR 3        ; asm85 evaluates -1 first and then shifts it
+2191 ff 1f         142:         dw      (-1) SHR 3      ; same as above
+2193 00 00         143:         dw      -(1 SHR 3)      ; Intel would shift 1 first then negate the result
+                   144: 
+                   145: ; Intel85 places the logical NOT operator at a lower precedence than C++. The
+                   146: ; asm85 code follows the Intel result, so this may not be what C++ programmers
+                   147: ; are expecting.
+2195 01 00         148:         dw      NOT 3 EQ 2      ; Intel and asm85 use the obvious 3 not equal 2
+2197 01 00         149:         dw      NOT (3 EQ 2)    ; same as above
+2199 00 00         150:         dw      (NOT 3) EQ 2    ; C++ version !3 == 2 would do the NOT first
+                   151: 
+                   152: ; Additions to Intel85 expressions in asm85
+                   153: ; There are several new operators in asm85 to support additional operations or to
+                   154: ; give compatibility with other observed .asm files
+219b 30 40         155: EXPR01: db      3 << 4, 128 >> 1 ; C++ style alias are provided for SHL and SHR
+219d 03            156:         db      99 % 8          ; C++ style alias is provided for MOD
+219e 00 00         157:         dw      EXPR01 = 0ffffH ; the = alias is provided for the EQ test
+21a0 ee dd         158:         dw      ~02211H         ; the ~ (tilde) performs bitwise NOT
+21a2 54 00         159:         dw      't' & 5fH       ; the & (ampersand) performs bitwise AND
+21a4 74 00         160:         dw      'T' | 20H       ; the | (vertical bar) performs bitwise OR
+21a6 66 22         161:         dw      3377H ^ 1111H   ; the ^ (carat) performs bitwise XOR
+                   162: 
+                   163: ; The behavior of the logical (NOT, AND, OR, and XOR) operators isn't entirely
+                   164: ; clear in the Intel85 manual.  The operations only evaluate the least significant
+                   165: ; bit of the operand.  For example, the manual states that 1 is returned if both
+                   166: ; ANDed bits are 1, so 0001 AND 0001 would return 0001.  It is not clear if other
+                   167: ; bits are also ANDed or if they are masked.  For axample, 1001 AND 1011 could
+                   168: ; return either 1001 or just 0001.  The relations (EQ, NE, LT, etc) operators
+                   169: ; return 00H or FFH, so that would also be a reasonable model to follow.
+                   170: ; The expression evaluator in asm85 will mask off all bits other than the LSB,
+                   171: ; so 1011 AND 1011 will return 1.
+                   172: ; In the end, it shouldn't matter because relational operators will only use the
+                   173: ; LSB and this is the typical use of the logical operators.  The ambiguiity will
+                   174: ; only be a problem if the results of a logical are used in an arithmetic or
+                   175: ; bitwise expression.
+21a8 01            176:         db      NOT 0           ; 1
+21a9 00            177:         db      NOT 1           ; 0
+21aa 00            178:         db      NOT 0111B       ; 0, because LSB is 1
+21ab 01            179:         db      NOT 0110B       ; 1, because LSB is 0
+21ac 00            180:         db      0 AND 0         ; 0
+21ad 01            181:         db      1 AND 1         ; 1
+21ae 00            182:         db      1 AND 0         ; 0
+21af 00            183:         db      0 AND 1         ; 0
+21b0 00            184:         db      2 AND 3         ; 0, both LSBs not 0
+21b1 01            185:         db      7 AND 3         ; 1, both LSBs are 1
+21b2 00            186:         db      0 OR 0          ; 0
+21b3 01            187:         db      1 OR 1          ; 1
+21b4 01            188:         db      1 OR 0          ; 1
+21b5 01            189:         db      0 OR 1          ; 1
+21b6 00            190:         db      2 OR 4          ; 0, both LSBs are 0
+21b7 01            191:         db      7 OR 3          ; 1, both LSBs are 1
+21b8 00            192:         db      0 XOR 0         ; 0, LSBs equal
+21b9 00            193:         db      1 XOR 1         ; 0, LSBs equal
+21ba 01            194:         db      1 XOR 0         ; 1, LSBs not equal
+21bb 01            195:         db      0 XOR 1         ; 1, LSBs not equal
+21bc 01            196:         db      2 XOR 3         ; 1, LSBs not equal
+21bd 00            197:         db      7 XOR 3         ; 0, LSBs equal
+21be 00            198:         db      not not 0       ; 0
+21bf 01            199:         db      not not 1       ; 1
+                   200: 
+                   201: ; Precedence of logical and relational operators
+                   202: ; From highest to lowest: EQ, NOT, AND, OR/XOR
+                   203: ; These are intuitive
+21c0 01            204:         db      NOT 5 EQ 7      ; EQ then NOT
+21c1 01            205:         db      NOT (5 EQ 7)    ; same as above
+21c2 01            206:         db      5 EQ 7 OR 1 EQ 1     ; EQ then OR
+21c3 01            207:         db      (5 EQ 7) OR (1 EQ 1) ; same as above
+                   208: ; But this is not
+21c4 01            209:         db      NOT 1 OR 1      ; NOT then OR
+21c5 01            210:         db      (NOT 1) OR 1    ; same as above
+21c6 00            211:         db      NOT (1 OR 1)    ; force the OR before the NOT
+                   212: ; All of these evaluate to TRUE
+21c7 ff            213:         db      (2 eq 3 or not 2 eq 3)   EQ  ((2 eq 3) or (not (2 eq 3)))
+21c8 ff            214:         db      (2 eq 3 and not 2 eq 3)  EQ  ((2 eq 3) and (not (2 eq 3)))
+21c9 ff            215:         db      (2 eq 3 xor not 2 eq 3)  EQ  ((2 eq 3) xor (not (2 eq 3)))
+21ca ff            216:         db      (not 2 eq 3 or not 2 eq 3)   EQ  (not (2 eq 3) or (not (2 eq 3)))
+21cb ff            217:         db      (not 2 eq 3 and not 2 eq 3)  EQ  (not (2 eq 3) and (not (2 eq 3)))
+21cc ff            218:         db      (not 2 eq 3 xor not 2 eq 3)  EQ  (not (2 eq 3) xor (not (2 eq 3)))
+21cd ff            219:         db      (not not 2 eq 3 or not 2 eq 3)   EQ  ((not (not (2 eq 3))) or (not (2 eq 3)))
+21ce ff            220:         db      (not not 2 eq 3 and not 2 eq 3)  EQ  ((not (not (2 eq 3))) and (not (2 eq 3)))
+21cf ff            221:         db      (not not 2 eq 3 xor not 2 eq 3)  EQ  ((not (not (2 eq 3))) xor (not (2 eq 3)))
+21d0 ff            222:         db      (not (not 2 eq 3 or not 2 eq 3))   EQ  (not ((not (2 eq 3)) or (not (2 eq 3))))
+21d1 ff            223:         db      (not (not 2 eq 3 and not 2 eq 3))  EQ  (not ((not (2 eq 3)) and (not (2 eq 3))))
+21d2 ff            224:         db      (not (not 2 eq 3 xor not 2 eq 3))  EQ  (not ((not (2 eq 3)) xor (not (2 eq 3))))
+                   225: 
+                   226: ; Address
+                   227: ; The $ symbol is used in an expression to represent the current address.
+                   228: ; This is useful for calculating the size of objects
+21d3 48 65 6c 6c   229: hello:  db  "Hello, world"
      6f 2c 20 77
      6f 72 6c 64
-(000c)             123: strLen  equ     $ - hello       ; Length of the string
-                   124: 
-                   125: jump_tab:                       ; Jump table.  Each entry is 3 octets.
-2186 61            126:         db      'a'             ; ADD command
-2187 00 01         127:         dw      0100h           ; Handler address
-2189 65            128:         db      'e'             ; EXAMINE command
-218a 42 01         129:         dw      0142h
-218c 70            130:         db      'p'             ; PRINT command
-218d 20 02         131:         dw      0220h
-218f 73            132:         db      's'             ; STEP command
-2190 34 03         133:         dw      0334h
-2192 78            134:         db      'x'             ; EXIT command
-2193 34 04         135:         dw      0434h
-(0005)             136: entries equ     ($-jump_tab) / 3 ; Number of entries in the table
-                   137: 
-                   138: 
-                   139: ; It is legal, though probably not wise, to have a label with the same name
-                   140: ; as a register.  This looks confusing, but it will work.  All of the examples
-                   141: ; below load register pair HL with the address of the word at label "SP".  None
-                   142: ; of these have any relation to the SP register.
-2195 00 01         143: SP:     dw      256             ; define a word at location named SP
-2197 21 95 21      144:         LXI     H,SP            ; laod address of "SP" word into HL pair
-219a 21 95 21      145:         LXI     H,SP+0
-219d 21 95 21      146:         LXI     H,0+SP
-                   147: 
-                   148: 
+(000c)             230: strLen  equ     $ - hello       ; Length of the string
+                   231: 
+                   232: jump_tab:                       ; Jump table.  Each entry is 3 octets.
+21df 61            233:         db      'a'             ; ADD command
+21e0 00 01         234:         dw      0100h           ; Handler address
+21e2 65            235:         db      'e'             ; EXAMINE command
+21e3 42 01         236:         dw      0142h
+21e5 70            237:         db      'p'             ; PRINT command
+21e6 20 02         238:         dw      0220h
+21e8 73            239:         db      's'             ; STEP command
+21e9 34 03         240:         dw      0334h
+21eb 78            241:         db      'x'             ; EXIT command
+21ec 34 04         242:         dw      0434h
+(0005)             243: entries equ     ($-jump_tab) / 3 ; Number of entries in the table
+                   244: 
+                   245: 
+                   246: ; It is legal, though probably not wise, to have a label with the same name
+                   247: ; as a register.  This looks confusing, but it will work.  All of the examples
+                   248: ; below load register pair HL with the address of the word at label "SP".  None
+                   249: ; of these have any relation to the SP register.
+                   250: ; Labels that match registers are not permitted in Intel85, but this change was
+                   251: ; added to support some code that was developed with a different assembler.
+21ee 00 01         252: SP:     dw      256             ; define a word at location named SP
+21f0 21 ee 21      253:         LXI     H,SP            ; laod address of "SP" word into HL pair
+21f3 21 ee 21      254:         LXI     H,SP+0
+21f6 21 ee 21      255:         LXI     H,0+SP
+                   256: 
+                   257: ; Names of alphabetic expression operations are reserved words in asm85 and cannot
+                   258: ; be used as labels or names.  This is compatible with Intel85 as well.
+                   259: ; Reserved words are: HIGH, LOW, MOD, SHL, SHR, EQ, NE, LE, LT, GE, GT, NOT, AND, OR, XOR.
 
-148 lines, 0 errors, 0 warnings
+259 lines, 0 errors, 0 warnings
 
 
 SYMBOL TABLE:
@@ -223,11 +334,13 @@ words5          : 20e0 (8416)
 StrSize         : 0020 (32)
 buffer          : 20ea (8426)
 t               : 216a (8554)
-hello           : 217a (8570)
+PREC            : 217a (8570)
+EXPR01          : 219b (8603)
+hello           : 21d3 (8659)
 strLen          : 000c (12)
-jump_tab        : 2186 (8582)
+jump_tab        : 21df (8671)
 entries         : 0005 (5)
-SP              : 2195 (8597)
+SP              : 21ee (8686)
 
 
-Total memory is 288 bytes
+Total memory is 377 bytes

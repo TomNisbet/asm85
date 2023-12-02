@@ -1,5 +1,5 @@
 CC=g++
-FLAGS=-ggdb -Wall
+FLAGS=-ggdb -Wall -g
 
 
 all: asm85.cpp imagestore.cpp instructions.cpp symboltable.cpp scanner.cpp
