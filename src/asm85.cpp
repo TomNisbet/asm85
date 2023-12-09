@@ -31,6 +31,8 @@ class AsmLine {
         RET_DIR_EQU,        // EQU directive, value in auxValue
         RET_DIR_DS,         // DS directive, size in auxValue
         RET_NOTHING_DONE,   // No processing done for this line
+
+        RET_BAD_STATUSES,   // any status  after this is bad
         RET_WARNING,        // Warning condition detected
         RET_ERROR,          // Error condition detected
         RET_PASS1_ERROR     // Error that is only detected at pass 1.
@@ -49,7 +51,7 @@ class AsmLine {
     const int GetNumBytes() { return numBytes; }
     uint16_t GetStartAddr() { return startAddr; }
     uint16_t GetAuxValue() { return auxValue; }
-
+    bool IsBadStatus(int status)  { return status > RET_BAD_STATUSES; }
   private:
     char        errorMsg[BUFFER_SIZE];
     uint8_t     bytes[BUFFER_SIZE];
@@ -58,10 +60,12 @@ class AsmLine {
     uint16_t    auxValue;
     Scanner     scanner;
     int         pass;
+    int         labelKind;
     char *      pLabel;
     char *      pMnemonic;
 
     int Failure(int status, const char * pMsg, const char * pParam = NULL);
+    int ProcessConditional();
     int ProcessDirective();
     int ProcessInstruction();
     int StoreArgList(int size);
@@ -99,36 +103,56 @@ int AsmLine::Process(const char * line, uint16_t addr, int ps) {
         pMnemonic = NULL;
     }
 
+    labelKind = Scanner::V_NONE;
     int t = scanner.Init(line);
     if (t == Scanner::T_LABEL) {
         pLabel = strdup(scanner.GetString());
+        labelKind = scanner.GetValue();
         t = scanner.Next();
     }
     if (t == Scanner::T_IDENTIFIER) {
         pMnemonic = strdup(scanner.GetString());
         scanner.Next();
-    }
-    else if (t == Scanner::T_ERROR) {
+    } else if (t == Scanner::T_ERROR) {
         return Failure(RET_ERROR, scanner.GetErrorMsg());
     }
 
-    int status = RET_NOTHING_DONE;
-    if (pLabel && (pass == 1)) {
-        status = symbols.Add(pLabel, startAddr);
+    int status = ProcessConditional();
+/*
+returns SKIP, NOTHING, or OK.. processing continues on NOTHING
+
+after return:
+if SKIP, call Scanner::skipToEnd which forces EOF and then return NOTHING
+otherwise do the symbols table add for the OK or NOTHING case and then return if OK case
+
+end of processing code should check for EOF on the OK and Nothing case
+*/
+
+    if (pLabel && (labelKind == Scanner::V_LABEL)) {
+        status = (pass == 1) ? symbols.Add(pLabel, startAddr) : symbols.Update(pLabel, startAddr);
         if (status == SymbolTable::RET_DUPLICATE) {
-            return Failure(RET_PASS1_ERROR, "Symbol defined more than once", pLabel);
+            return Failure(RET_ERROR, "Symbol defined more than once", pLabel);
         }
     }
-    if (pMnemonic == NULL) {
-        return RET_NOTHING_DONE;
-    }
 
-    status = ProcessDirective();
+    if (pMnemonic) {
+        status = ProcessDirective();
+    }
+//    printf("status=%u, kind=%2u, %-10s %-10s\n", status, labelKind, pLabel, pMnemonic);
     if (status == RET_NOTHING_DONE) {
-        status = ProcessInstruction();
+        if (labelKind == Scanner::V_NAME) {
+            // Names are only used with assembler directives.  If a string was found
+            // in column 1 and it wasn't processed above then it is probably not
+            // a name, but instead an instruction or directive in the wrong column.
+            return Failure(RET_ERROR, "Expecting label, comment, or space n column 1, found", pLabel);
+        } else if (pMnemonic) {
+            status = ProcessInstruction();
+        }
     }
 
-    return status;
+    return (IsBadStatus(status) || scanner.IsEnd()) ? 
+        status : 
+        Failure(RET_ERROR, "Expecting end of line, found", scanner.GetString());
 }
 
 
@@ -141,6 +165,15 @@ int AsmLine::Failure(int status, const char * pMsg, const char * pParam) {
     }
 
     return status;
+}
+
+
+int AsmLine::ProcessConditional() {
+    if (scanner.GetType() == Scanner::T_CONDITIONAL) {
+        scanner.SkipToEnd();
+        return RET_OK;
+    }
+    return RET_NOTHING_DONE;
 }
 
 
@@ -157,20 +190,27 @@ int AsmLine::ProcessDirective() {
         auxValue = uint16_t(val);
         return RET_DIR_EQU; // Same output as EQU
     }
-    else if (strcasecmp("EQU", pMnemonic) == 0) {
+
+    else if ((strcasecmp("EQU", pMnemonic) == 0) || (strcasecmp("SET", pMnemonic) == 0)) {
         if (pLabel == NULL) {
-            return Failure(RET_ERROR, "No label for EQU directive");
+            return Failure(RET_ERROR, "Must specify name before EQU or SET");
+        }
+        else if (labelKind != Scanner::V_NAME) {
+            return Failure(RET_ERROR, "EQU or SET name should not end in ':'");
         }
         else {
+            bool isRW = toupper(pMnemonic[0]) == 'S';
             unsigned val = EvaluateExpression();
             if (val == EXPR_ERROR) {
                 // Error message provided by Evaluate.
                 return RET_ERROR;
             }
-            status = symbols.Update(pLabel, val);
-            if (status != SymbolTable::RET_OK) {
-                // Shouldn't happen because label was added just before this call.
-                return Failure(RET_ERROR, "could not update symbol", pLabel);
+            status = (pass == 1) ? symbols.Add(pLabel, val, isRW) : symbols.Update(pLabel, val);
+            if (status == SymbolTable::RET_DUPLICATE) {
+                return Failure(RET_ERROR, "symbol has already been defined", pLabel);
+            }
+            else if (status == SymbolTable::RET_TABLE_FULL) {
+                return Failure(RET_ERROR, "could not add symbol, table full", pLabel);
             }
             auxValue = uint16_t(val);
             return RET_DIR_EQU;
@@ -201,6 +241,17 @@ int AsmLine::ProcessDirective() {
         return RET_OK;
     }
 
+    else if (strcasecmp("CPU", pMnemonic) == 0) {
+        const char * cpu = scanner.GetString();
+        if (strcmp(cpu, "8085") && strcmp(cpu, "8080")) {
+                return Failure(RET_ERROR, "Unsupported CPU type, must be 8085 or 8080", cpu);
+        }
+        // This doesn't really do anything.  Just mark it as processed so
+        // it does not get interpreted as a processor instruction.
+        scanner.SkipToEnd();
+        return RET_OK;
+    }
+
     // Signal that no assembler directive was found so this line should be
     // processed as a machine instruction.
     return RET_NOTHING_DONE;
@@ -226,7 +277,7 @@ int AsmLine::ProcessInstruction() {
         }
         bytes[numBytes++] = 0xc7 | ((*arg - '0') << 3);
         if (scanner.Next() != Scanner::T_EOF) {
-            return Failure(RET_ERROR, "Found extra arguments after RST instruction:", scanner.GetString());
+            return Failure(RET_ERROR, "Found extra arguments after RST instruction", scanner.GetString());
         }
         return RET_OK;
     }
@@ -350,7 +401,7 @@ int AsmLine::StoreArgList(int size) {
     }
 
     if (scanner.GetType() != Scanner::T_EOF) {
-        return Failure(RET_WARNING, "Found additional characters after expression list:",
+        return Failure(RET_WARNING, "Found additional characters after expression list",
                        scanner.GetString());
     }
     return RET_OK;
@@ -451,7 +502,7 @@ unsigned AsmLine::EvaluateAtom() {
     }
 
     else {
-        Failure(RET_ERROR, "Expected label or numeric constant, found:", scanner.GetString());
+        Failure(RET_ERROR, "Expected label or numeric constant, found", scanner.GetString());
         val = EXPR_ERROR;
     }
 

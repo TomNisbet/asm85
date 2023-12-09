@@ -34,18 +34,19 @@ int Scanner::Init(const char * ln) {
         else {
             if ((*pCursor == ':') || isspace(*pCursor)) {
                 tokenType = T_LABEL;
+                tokenValue = (*pCursor == ':') ? V_LABEL : V_NAME;
                 ++pCursor;
             }
             else {
+                tokenValue = 0;
                 Failure("Label must end with ':' or space or tab character.");
             }
-            tokenValue = 0;
         }
         return tokenType;
     }
 
     else if (!isspace(*pCursor) && (*pCursor != ';') && (*pCursor != '\0')) {
-        return Failure("Illegal character in column 1.  Must be label, comment, or space. Found:", pCursor);
+        return Failure("Illegal character in column 1.  Must be label, name, comment, or space. Found", pCursor);
     }
 
     // No label and first character was space.  Return the first token.
@@ -180,6 +181,17 @@ int Scanner::ScanIdentifier() {
             if ((c1 == 'Q') && (c2 == '\0')) {
                 tokenType = T_RELATE_OPER;
                 tokenValue = V_EQ;
+            } else if ((c1 == 'N') && (c2 == 'D') && (tokenStr[3] == 'I') && (tokenStr[4] == 'F') && (tokenStr[5] == '\0')) {
+                tokenType = T_CONDITIONAL;
+                tokenValue = V_ENDIF;
+            } else if ((c1 == 'L') && (c2 == 'S') && (tokenStr[3] == 'E')) {
+                if  (tokenStr[4] == '\0') {
+                    tokenType = T_CONDITIONAL;
+                    tokenValue = V_ELSE;
+                } else if ((tokenStr[4] == 'I') && (tokenStr[5] == 'F') && (tokenStr[6] == '\0')) {
+                    tokenType = T_CONDITIONAL;
+                    tokenValue = V_ELSEIF;
+                }
             }
             break;
         case 'G':
@@ -195,6 +207,12 @@ int Scanner::ScanIdentifier() {
             if ((c1 == 'I') && (c2 == 'G') && (tokenStr[3] == 'H') && (tokenStr[4] == '\0')) {
                 tokenType = T_ISOLATE_OPER;
                 tokenValue = V_HIGH;
+            }
+            break;
+        case 'I':
+            if ((c1 == 'F') && (c2 == '\0')) {
+                tokenType = T_CONDITIONAL;
+                tokenValue = V_IF;
             }
             break;
         case 'L':
@@ -257,7 +275,8 @@ int Scanner::ScanConstant() {
     // Copy the constant into the token string.  Note that isxdigit is also
     // catching the 'B' and 'D' suffixes for decimal and binary.
     char * p = tokenStr;
-    while ((isxdigit(*pCursor) || (toupper(*pCursor) == 'H')) &&
+//    while ((isxdigit(*pCursor) || (toupper(*pCursor) == 'H')) &&
+    while (isalnum(*pCursor) &&
            (p < (tokenStr + sizeof(tokenStr) - 1))) {
         *p++ = *pCursor++;
     }
@@ -268,16 +287,22 @@ int Scanner::ScanConstant() {
     if (c == 'H') {
         base = 16;
     }
-    else if (c == 'B') {
-        base = 2;
-    }
     else if ((c == 'D') || isdigit(c)) {
         // Decimal suffix is optional.
         base = 10;
     }
-    else {
+    else if (c == 'B') {
+        base = 2;
+    }
+    else if ((c == 'O') || (c == 'Q')) {
+        base = 8;
+    }
+    else if ((c == 'A') || (c == 'C') || (c == 'E') || (c == 'F')) {
         // String ended with A, C, E, or F.  Probably hex with no suffix.
         return Failure("Bad numeric constant.  Hex constants must end with 'H'", tokenStr);
+    }
+    else {
+            return Failure("Illegal character in decimal constant", tokenStr);
     }
 
     tokenType = T_CONSTANT;
@@ -290,6 +315,9 @@ int Scanner::ScanConstant() {
         }
         else if ((base == 2) && (*p != '0') && (*p != '1')) {
             return Failure("Illegal character in binary constant", tokenStr);
+        }
+        else if ((base == 8) && ((*p < '0') || (*p > '7'))) {
+            return Failure("Illegal character in octal constant", tokenStr);
         }
         else if (!isxdigit(*p)) {
             return Failure("Illegal character in hex constant", tokenStr);
@@ -377,6 +405,7 @@ void Scanner::SkipWhite() {
 
 int Scanner::Failure(const char * pMsg, const char * pParam) {
     tokenType = T_ERROR;
+    tokenValue = V_NONE;
     if (pParam) {
         snprintf(errorMsg, sizeof(errorMsg), "%s: %s", pMsg, pParam);
     }

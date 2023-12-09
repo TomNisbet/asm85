@@ -28,17 +28,18 @@ VeryVeryVeryLongLabel:
 RAMST   equ     00000h          
 ROMST   equ     0c000h         
 
-; Constants can be decimal, hex, or binary.  Binary is indicated with a
-; trailing 'b' and hex with a trailing 'h' character.  All constants must
-; start with a numeric character, so hex values starting with A-F must have
-; a leading zero.
+; Constants can be decimal, binary, hex, or octal.  Binary is indicated with a
+; trailing 'b' hex with a trailing 'h', and octal with a trailing 'o' or 'q'
+; character.  Decimal constants can have a trailing 'd' character, but it is
+; not required.  All constants must start with a numeric character, so hex 
+; values starting with A-F must have a leading zero.
 num0    equ     55              ; Decimal constant
 num1    equ     55D             ; Decimal constant with optional suffix
-num2    EQU     55h             ; Hex
 num3    equ     0a6h            ; Hex with leading zero
-num4    equ     1234H           ; Hex without leading zero
+num4    equ     1AB4H           ; Hex without leading zero
 num5    equ     01100101b       ; Binary
-CAB     equ     0CABh           ; Note label 'CAB' and constant '0CABh'
+num6    equ     1357o           ; Octal with trailing 'o'
+num7    equ     1011Q           ; Octal with trailing 'q'
 
 ; The DB directive places one or more bytes of data in the output.
 d1:     db      5               ; single byte

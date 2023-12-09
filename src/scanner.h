@@ -35,7 +35,8 @@ public:
         T_BIT_OR_OPER,
         T_LOGIC_NOT_OPER,
         T_LOGIC_AND_OPER,
-        T_LOGIC_OR_OPER
+        T_LOGIC_OR_OPER,
+        T_CONDITIONAL
     };
 
     enum {
@@ -59,12 +60,18 @@ public:
         V_LE,
         V_LT,
         V_HIGH,
-        V_LOW
+        V_LOW,
+        V_IF,
+        V_ELSE,
+        V_ELSEIF,
+        V_ENDIF
     };
 
     int Init(const char * ln);
     int Next();
     void ChangeRegisterToId() { if (tokenType == T_REGISTER) tokenType = T_IDENTIFIER; }
+    void SkipToEnd() { tokenType = T_EOF; }
+    bool IsEnd() { return tokenType == T_EOF; }
     char PeekChar();
     int GetLength();
     int GetType() { return tokenType; }

@@ -11,6 +11,8 @@ class SymbolTableEntry {
 public:
     char *      name;
     unsigned    val;
+    bool        rw;
+    bool        updated;
 };
 
 
@@ -28,7 +30,7 @@ public:
     };
 
     SymbolTable() { numEntries = 0; }
-    int Add(const char * name, unsigned val);
+    int Add(const char * name, unsigned val, bool rw=false);
     int Update(const char * name, unsigned val);
     unsigned Lookup(const char * name);
     void Dump(FILE * pFile);

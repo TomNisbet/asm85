@@ -1,4 +1,4 @@
-asm85 8085 Assembler v1.2 by nib
+asm85 8085 Assembler v1.5 by nib
 
                      1: ; Test and demonstrate assembly errors
                      2: ; lines marked with ERR are detected by the assenbler
@@ -6,132 +6,180 @@ asm85 8085 Assembler v1.2 by nib
                      4: 
                      5: ; constants
 (0037)               6: symd1   equ 55          ; decimal constant
-(0005)               7: symd2   equ 5X5         ; *ERR: bad decimal constant
-(05a5)               8: symh1   equ 5A5h        ; hex constant
-                     9: symh2   equ 5A5         ; ERR: missing H for hex constant
+                     7: symd2   equ 5X5         ; ERR: bad decimal constant
+ERROR - Illegal character in decimal constant: 5X5
+
+                     8: symd3   equ 55X         ; ERR: bad decimal constant
+ERROR - Illegal character in decimal constant: 55X
+
+(05a5)               9: symh1   equ 5A5h        ; hex constant
+                    10: symh2   equ 5A5         ; ERR: missing H for hex constant
 ERROR - Illegal character in decimal constant: 5A5
 
-                    10: symh3   equ ffffH       ; ERR: hex must start with numeric
+                    11: symh3   equ ffffH       ; ERR: hex must start with numeric
 ERROR - Label not found: ffffH
 
-(ffff)              11: symh4   equ 0ffffH      ; Hex with leading zero
-(0066)              12: symb1   equ 01100110b   ; Binary constant
-                    13: symb2   equ 01101210b   ; ERR: bad binary constant
+(ffff)              12: symh4   equ 0ffffH      ; Hex with leading zero
+(0066)              13: symb1   equ 01100110b   ; Binary constant
+                    14: symb2   equ 01101210b   ; ERR: bad binary constant
 ERROR - Illegal character in binary constant: 01101210b
 
-                    14: 
-(0077)              15: bah     equ 77h
-                    16: bad:    db  "where is the end  ; ERR: unterminated string
+(0053)              15: symq1   equ 123q        ; octal constant
+                    16: symq2   equ 128o        ; ERR: bad octal constant
+ERROR - Illegal character in octal constant: 128o
+
+                    17: 
+(0077)              18: bah     equ 77h
+                    19: bad:    db  "where is the end  ; ERR: unterminated string
 ERROR - Unterminated string: "where is the end  ; ERR: unterminated string
 
-0000 09 0a 0d 77    17: special:db  "\t\n\r",bah,beh, bad  ; ERR: undefined symbol
+0000 09 0a 0d 77    20: special:db  "\t\n\r",bah,beh, bad  ; ERR: undefined symbol
 ERROR - Label not found: beh
 
-                    18: 
-                    19: ; column zero
-                    20: LABEL1:                 ; label can start in column 0
-0004 4f             21: LABEL2: MOV   C,A       ; label with instruction also OK
-(0007)              22: NAME1   EQU   7         ; name can start in column zero
-                    23: 123                     ; ERR: not name or label
-ERROR - Illegal character in column 1.  Must be label, comment, or space. Found:: 123                     ; ERR: not name or label
+                    21: 
+                    22: ; column zero
+                    23: LABEL1:                 ; label can start in column 0
+0004 4f             24: LABEL2: MOV   C,A       ; label with instruction also OK
+(0007)              25: NAME1   EQU   7         ; name can start in column zero
+                    26: 123                     ; ERR: not name or label
+ERROR - Illegal character in column 1.  Must be label, name, comment, or space. Found: 123                     ; ERR: not name or label
 
-                    24: "abc"                   ; ERR: not name or label
-ERROR - Illegal character in column 1.  Must be label, comment, or space. Found:: "abc"                   ; ERR: not name or label
+                    27: "abc"                   ; ERR: not name or label
+ERROR - Illegal character in column 1.  Must be label, name, comment, or space. Found: "abc"                   ; ERR: not name or label
 
-                    25: +                       ; ERR: not name or label
-ERROR - Illegal character in column 1.  Must be label, comment, or space. Found:: +                       ; ERR: not name or label
+                    28: +                       ; ERR: not name or label
+ERROR - Illegal character in column 1.  Must be label, name, comment, or space. Found: +                       ; ERR: not name or label
 
-                    26: mov h,l                 ; *ERR: instruction can't start in column zero
-                    27: 
-                    28: ; extra information on line and extra/incorrect arguments
-                    29:         nop     SP      ; ERR: extra register argument
+                    29: mov h,l                 ; ERR: instruction can't start in column zero
+ERROR - Expecting label, comment, or space n column 1, found: mov
+
+                    30: 
+                    31: ; extra information on line and extra/incorrect arguments
+                    32:         nop     SP      ; ERR: extra register argument
 ERROR - Wrong number of register arguments for instruction: nop
 
-                    30:         nop     d,e     ; ERR: multiple extra registers
+                    33:         nop     d,e     ; ERR: multiple extra registers
 ERROR - Wrong number of register arguments for instruction: nop
 
-0005 00             31:         nop     str     ; ERR: extra expression argument
+0005 00             34:         nop     str     ; ERR: extra expression argument
 ERROR - Additional arguments after instruction: str
 
-0006 00             32:         nop     12XX    ; ERR: extra characters
-ERROR - Additional arguments after instruction: 12
+0006 00             35:         nop     12XX    ; ERR: extra characters
+ERROR - Additional arguments after instruction: 12XX
 
-                    33:         MOV     A       ; ERR: missing second register
+                    36:         MOV     A       ; ERR: missing second register
 ERROR - Wrong number of register arguments for instruction: MOV
 
-                    34:         MOV     A,4     ; ERR: missing second register
+                    37:         MOV     A,4     ; ERR: missing second register
 ERROR - Wrong number of register arguments for instruction: MOV
 
-0007 06             35:         MVI     B,A     ; ERR: second arg should be expression
+0007 06             38:         MVI     B,A     ; ERR: second arg should be expression
 ERROR - Label not found: A
 
-0008 c3             36:         JMP     SP      ; ERR: first arg should be expression
+0008 c3             39:         JMP     SP      ; ERR: first arg should be expression
 ERROR - Label not found: SP
 
-0009 ca             37:         JZ              ; ERR: missing arg
-ERROR - Expected label or numeric constant, found:: ;
+0009 ca             40:         JZ              ; ERR: missing arg
+ERROR - Expected label or numeric constant, found: ;
 
-000a 06             38:         MVI     b,1+2+  ; *ERR: extra chars in expression
-ERROR - Expected label or numeric constant, found:: ;
+000a 06             41:         MVI     b,1+2+  ; ERR: extra chars in expression
+ERROR - Expected label or numeric constant, found: ;
 
-                    39: 
-                    40: ; RST instructions
-000b c7             41:         RST     0       ; OK
-                    42:         RST     A       ; ERR: must be number
+                    42: 
+                    43: ; RST instructions
+000b c7             44:         RST     0       ; OK
+                    45:         RST     A       ; ERR: must be number
 ERROR - RST instruction argument must be 0-7: A
 
-(0001)              43: RNUM    equ     1
-                    44:         RST     RNUM    ; ERR: expression not allowed
+(0001)              46: RNUM    equ     1
+                    47:         RST     RNUM    ; ERR: expression not allowed
 ERROR - RST instruction argument must be 0-7: RNUM
 
-000c cf             45:         RST     1+1     ; ERR: expression not allowed
-ERROR - Found extra arguments after RST instruction:: +
+000c cf             48:         RST     1+1     ; ERR: expression not allowed
+ERROR - Found extra arguments after RST instruction: +
 
-000d ff             46:         RST     7       ; OK
-                    47:         RST     9       ; ERR: RST number must be 0..7
+000d ff             49:         RST     7       ; OK
+                    50:         RST     9       ; ERR: RST number must be 0..7
 ERROR - RST instruction argument must be 0-7: 9
 
-                    48: 
-                    49: ; characters in expressions      
-000e 06 50          50:         mvi     b,'P'   ; single char is a byte
-0010 11 52 51       51:         lxi     d,'QR'  ; two chars is a sixteen bit value
-0013 1e             52:         mvi     e,'abc' ; ERR: Can't use string in expression
+                    51: 
+                    52: ; characters in expressions      
+000e 06 50          53:         mvi     b,'P'   ; single char is a byte
+0010 11 52 51       54:         lxi     d,'QR'  ; two chars is a sixteen bit value
+0013 1e             55:         mvi     e,'abc' ; ERR: Can't use string in expression
 ERROR - Multi-character string not allowed in expression.
 
-0014 01 02 19       53:         lxi     b,'a'*'B' ; weird, but legal
-                    54: 
-                    55: 
-                    56: ; math
-                    57: var1    equ     23 / 0  ; ERR: divide by zero
+0014 01 02 19       56:         lxi     b,'a'*'B' ; weird, but legal
+                    57: 
+                    58: 
+                    59: ; math
+                    60: var1    equ     23 / 0  ; ERR: divide by zero
 ERROR - Divide by zero
 
-0017 09 01          58: var2    dw      255 + 10; OK as a 16 bit value
-0019 09             59: var3    db      255 + 10; *ERR: 8 bit constant overflow
+0017 09 01          61: var2:   dw      255 + 10; OK as a 16 bit value
+0019 09             62: var3:   db      255 + 10; *ERR: 8 bit constant overflow
+                    63: 
+                    64: 
+                    65: ; name/label mismatch
+001a 07 00          66: nam1    dw  7           ; ERR: dw uses label, not name
+001c +000a          67: nam2    ds  10          ; ERR: ds uses label, not name
+                    68: nam3    jmp 0           ; ERR: instruction uses label, not name
+ERROR - Expecting label, comment, or space n column 1, found: nam3
 
-59 lines, 24 errors, 0 warnings
+                    69: lab1:   equ 6           ; ERR: equ uses name, not label
+ERROR - EQU or SET name should not end in ':'
+
+                    70: lab2:   set 8           ; ERR: set uses name, not label
+ERROR - EQU or SET name should not end in ':'
+
+                    71: 
+                    72: ; redeine symbols and labels
+(0001)              73: equ1    equ 1           ; OK
+                    74: equ1    equ 2           ; ERR: redefined symbol with EQU
+ERROR - symbol has already been defined: equ1
+
+(0001)              75: set1    set 1           ; OK
+(0002)              76: set1    set 2           ; OK, can redefine SET
+(0003)              77: set1    equ 3           ; should be an error to mix set and equ
+(0004)              78: set1    set 4           ; OK, can redefine SET
+(0002)              79: equ2    equ 2           ; OK
+                    80: equ2    set 3           ; ERR: cannot redefine EQU
+ERROR - symbol has already been defined: equ2
+
+                    81: 
+0026 c3 00 00       82: lab3:   jmp 0           ; OK
+                    83: lab3:   jmp 1           ; ERR: label redefined
+ERROR - Symbol defined more than once: lab3
+
+0029 c3 02 00       84: lab4:   jmp 2           ; OK
+
+84 lines, 34 errors, 0 warnings
 
 
 SYMBOL TABLE:
 
 symd1           : 0037 (55)
-symd2           : 0005 (5)
 symh1           : 05a5 (1445)
-symh2           : 0000 (0)
 symh3           : 0000 (0)
 symh4           : ffff (65535)
 symb1           : 0066 (102)
-symb2           : 0000 (0)
+symq1           : 0053 (83)
 bah             : 0077 (119)
 bad             : 0000 (0)
 special         : 0000 (0)
-LABEL1          : 0006 (6)
-LABEL2          : 0006 (6)
+LABEL1          : 0004 (4)
+LABEL2          : 0004 (4)
 NAME1           : 0007 (7)
-mov             : 0007 (7)
 RNUM            : 0001 (1)
-var1            : 001c (28)
-var2            : 001c (28)
-var3            : 001e (30)
+var2            : 0017 (23)
+var3            : 0019 (25)
+lab1            : 0026 (38)
+lab2            : 0026 (38)
+equ1            : 0001 (1)
+set1            : 0004 (4)
+equ2            : 0002 (2)
+lab3            : 0026 (38)
+lab4            : 0029 (41)
 
 
-Total memory is 26 bytes
+Total memory is 34 bytes
