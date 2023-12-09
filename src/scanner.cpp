@@ -173,7 +173,7 @@ int Scanner::ScanIdentifier() {
     // AND, EQ, GE, GT, HIGH, LE, LT, LOW, MOD, NE, NOT, OR, SHL, SHR, XOR
     switch (c0) {
         case 'A':
-            if ((c1 == 'N') && (c2 == 'D') && (tokenStr[3] == '\0')) {
+            if (strcasecmp(tokenStr, "AND") == 0) {
                 tokenType = T_LOGIC_AND_OPER;
             }
             break;
@@ -181,17 +181,15 @@ int Scanner::ScanIdentifier() {
             if ((c1 == 'Q') && (c2 == '\0')) {
                 tokenType = T_RELATE_OPER;
                 tokenValue = V_EQ;
-            } else if ((c1 == 'N') && (c2 == 'D') && (tokenStr[3] == 'I') && (tokenStr[4] == 'F') && (tokenStr[5] == '\0')) {
+            } else if (strcasecmp(tokenStr, "ENDIF") == 0) {
                 tokenType = T_CONDITIONAL;
                 tokenValue = V_ENDIF;
-            } else if ((c1 == 'L') && (c2 == 'S') && (tokenStr[3] == 'E')) {
-                if  (tokenStr[4] == '\0') {
-                    tokenType = T_CONDITIONAL;
-                    tokenValue = V_ELSE;
-                } else if ((tokenStr[4] == 'I') && (tokenStr[5] == 'F') && (tokenStr[6] == '\0')) {
-                    tokenType = T_CONDITIONAL;
-                    tokenValue = V_ELSEIF;
-                }
+            } else if (strcasecmp(tokenStr, "ELSE") == 0) {
+                 tokenType = T_CONDITIONAL;
+                tokenValue = V_ELSE;
+            } else if (strcasecmp(tokenStr, "ELSEIF") == 0) {
+                tokenType = T_CONDITIONAL;
+                tokenValue = V_ELSEIF;
             }
             break;
         case 'G':
@@ -204,7 +202,7 @@ int Scanner::ScanIdentifier() {
             }
             break;
         case 'H':
-            if ((c1 == 'I') && (c2 == 'G') && (tokenStr[3] == 'H') && (tokenStr[4] == '\0')) {
+            if (strcasecmp(tokenStr, "HIGH") == 0) {
                 tokenType = T_ISOLATE_OPER;
                 tokenValue = V_HIGH;
             }
@@ -222,13 +220,13 @@ int Scanner::ScanIdentifier() {
             } else if ((c1 == 'T') && (c2 == '\0')) {
                 tokenType = T_RELATE_OPER;
                 tokenValue = V_LT;
-            } else  if ((c1 == 'O') && (c2 == 'W') && (tokenStr[3] == '\0')) {
+            } else if (strcasecmp(tokenStr, "LOW") == 0) {
                 tokenType = T_ISOLATE_OPER;
                 tokenValue = V_LOW;
             }
             break;
         case 'M':
-            if ((c1 == 'O') && (c2 == 'D') && (tokenStr[3] == '\0')) {
+            if (strcasecmp(tokenStr, "MOD") == 0) {
                 tokenType = T_FACTOR_OPER;
                 tokenValue = V_MOD;
             }
@@ -237,7 +235,7 @@ int Scanner::ScanIdentifier() {
             if ((c1 == 'E') && (c2 == '\0')) {
                 tokenType = T_RELATE_OPER;
                 tokenValue = V_NE;
-            } else if ((c1 == 'O') && (c2 == 'T') && (tokenStr[3] == '\0')) {
+            } else if (strcasecmp(tokenStr, "NOT") == 0) {
                 tokenType = T_LOGIC_NOT_OPER;
             }
             break;
@@ -248,16 +246,16 @@ int Scanner::ScanIdentifier() {
             }
             break;
         case 'S':
-            if ((c1 == 'H') && (c2 == 'L') && (tokenStr[3] == '\0')) {
+            if (strcasecmp(tokenStr, "SHL") == 0) {
                 tokenType = T_FACTOR_OPER;
                 tokenValue = V_SHL;
-            } else if ((c1 == 'H') && (c2 == 'R') && (tokenStr[3] == '\0')) {
+            } else if (strcasecmp(tokenStr, "SHR") == 0) {
                 tokenType = T_FACTOR_OPER;
                 tokenValue = V_SHR;
             }
             break;
         case 'X':
-            if ((c1 == 'O') && (c2 == 'R') && (tokenStr[3] == '\0')) {
+            if (strcasecmp(tokenStr, "XOR") == 0) {
                 tokenType = T_LOGIC_OR_OPER;
                 tokenValue = V_XOR;
             }
