@@ -22,6 +22,50 @@ extern InstructionEntry instructionTable[];
 
 const char * version = "1.5";
 
+
+////////////////////////////////////////////////////////////////////////////////
+class ConditionalContext {
+  public:
+    ConditionalContext(ConditionalContext * p) :
+        nestLevel(p ? p->nestLevel+1 : 1),
+        skipLevel(0),
+        subType(Scanner::V_IF),
+        bMatched(false),
+        bSkipping(false),
+        pNext(p)
+        {}
+    static ConditionalContext * DeleteTop(ConditionalContext * p);
+    static ConditionalContext * DeleteAll(ConditionalContext * p);
+
+    int                     nestLevel;
+    int                     skipLevel;
+    unsigned                subType;
+    bool                    bMatched;
+    bool                    bSkipping;
+
+  private:
+    ConditionalContext *    pNext;
+};
+
+ConditionalContext * ConditionalContext::DeleteTop(ConditionalContext * p) {
+    ConditionalContext * q = p->pNext;
+    delete p;
+    return q;
+}
+
+ConditionalContext * ConditionalContext::DeleteAll(ConditionalContext * p) {
+    while (p) {
+        ConditionalContext * q = p->pNext;
+        delete p;
+        p = q;
+    }
+    return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+static ConditionalContext * pContext = NULL;
+
+
 ////////////////////////////////////////////////////////////////////////////////
 class AsmLine {
   public:
@@ -31,6 +75,7 @@ class AsmLine {
         RET_DIR_EQU,        // EQU directive, value in auxValue
         RET_DIR_DS,         // DS directive, size in auxValue
         RET_NOTHING_DONE,   // No processing done for this line
+        RET_SKIP,           // Skip for conditional processing
 
         RET_BAD_STATUSES,   // any status  after this is bad
         RET_WARNING,        // Warning condition detected
@@ -44,7 +89,7 @@ class AsmLine {
     };
 
     AsmLine();
-    int Process(const char * line, uint16_t addr, int pass);
+    int Process(const char * line, unsigned lineNum, uint16_t addr, int pass);
 
     const char * GetErrorMsg() { return errorMsg; }
     const uint8_t * GetBytes() { return bytes; }
@@ -88,7 +133,7 @@ AsmLine::AsmLine() {
 }
 
 
-int AsmLine::Process(const char * line, uint16_t addr, int ps) {
+int AsmLine::Process(const char * line, unsigned lineNum, uint16_t addr, int ps) {
     strcpy(errorMsg, "asm85");
     startAddr = addr;
     pass = ps;
@@ -118,21 +163,28 @@ int AsmLine::Process(const char * line, uint16_t addr, int ps) {
     }
 
     int status = ProcessConditional();
-/*
-returns SKIP, NOTHING, or OK.. processing continues on NOTHING
+    if (status == RET_SKIP) {
+        // Skip this line due to conditional IF/ELSE processing
+        return RET_NOTHING_DONE;
+    }
+    bool bStopAfterLabel = status == RET_OK;
 
-after return:
-if SKIP, call Scanner::skipToEnd which forces EOF and then return NOTHING
-otherwise do the symbols table add for the OK or NOTHING case and then return if OK case
-
-end of processing code should check for EOF on the OK and Nothing case
-*/
-
+    // If a lebel is present, add it to the symbol table.  Note that the label is
+    // added in the first pass and updated in the second.  This allows errors to
+    // be caught in the second pass when the list file is generated.
     if (pLabel && (labelKind == Scanner::V_LABEL)) {
         status = (pass == 1) ? symbols.Add(pLabel, startAddr) : symbols.Update(pLabel, startAddr);
         if (status == SymbolTable::RET_DUPLICATE) {
             return Failure(RET_ERROR, "Symbol defined more than once", pLabel);
         }
+    }
+
+    if (bStopAfterLabel) {
+        // This line contained an IF/ELSE/ELSEIF/ENDIF directive.  Stop processing
+        // after adding the label.
+        return scanner.IsEnd() ?
+            RET_OK :
+            Failure(RET_ERROR, "Expecting end of line, found", scanner.GetString());
     }
 
     if (pMnemonic) {
@@ -169,10 +221,83 @@ int AsmLine::Failure(int status, const char * pMsg, const char * pParam) {
 
 
 int AsmLine::ProcessConditional() {
+    // All processing will happen for each pass because pass one conditionally
+    // adds labals and pass two conditionally adds code.
+    bool bSkipping = pContext && (pContext->bSkipping);
     if (scanner.GetType() == Scanner::T_CONDITIONAL) {
-        scanner.SkipToEnd();
+        unsigned subType = scanner.GetValue();
+        scanner.Next();
+        unsigned val;
+        if (subType == Scanner::V_IF) {
+            val = EvaluateExpression() & 1;  // Only test the LSB
+            if (bSkipping) {
+                // When an IF is encountered while skipping code, it must be
+                // counted so that its ENDIF can also be skipped.
+                ++pContext->skipLevel;
+                return RET_SKIP;
+            }
+            // Begin a new context and chain it to the previous one.  This
+            // allows nested IF/ELSE blocks.
+            pContext = new ConditionalContext(pContext);
+            // if v == err
+            if (val) {
+                pContext->bMatched = true;
+            } else {
+                pContext->bSkipping = true;
+            }
+
+        } else if ((subType == Scanner::V_ELSE) || (subType == Scanner::V_ELSEIF)) {
+            if (!pContext) {
+                return Failure(RET_ERROR, "ELSE or ELSEIF found without matching IF");
+            }
+            if (pContext->skipLevel) {
+                // No need to process ELSE/ELSEIF when counting IFs in a skipped block
+                scanner.SkipToEnd();
+                return RET_SKIP;
+            }
+
+            val = (subType == Scanner::V_ELSE) ? 1 : EvaluateExpression() & 1;
+            if (pContext->subType == Scanner::V_ELSE) {
+                return Failure(RET_ERROR, "ELSE or ELSEIF cannot follow ELSE");
+            }
+            if (!pContext->bSkipping) {
+                // Stop a previous block from processing on any ELSE or ELSEIF
+                pContext->bSkipping = true;
+                pContext->subType = subType;
+            }
+            else if (!pContext->bMatched && val) {
+                // No previous block matched and this is an ELSE or a 
+                // positive condition ELSEIF
+                pContext->bMatched = true;
+                pContext->bSkipping = false;
+                pContext->subType = subType;
+            }
+            
+        } else if (subType == Scanner::V_ENDIF) {
+            if (!pContext) {
+                return Failure(RET_ERROR, "ENDIF found without matching IF");
+            }
+            if (pContext->skipLevel) {
+                // Found the end of an IF/ELSE within a skipped block of code
+                --pContext->skipLevel;
+                return RET_SKIP;
+            }
+            else {
+                // Found the end of an active IF/ELSE block.  End this block and
+                // continue with a previous context if nesting or NULL context
+                // if all nested blocks are complete.
+                pContext = ConditionalContext::DeleteTop(pContext);
+            }
+        }
+
         return RET_OK;
     }
+
+    if (bSkipping) {
+        scanner.SkipToEnd();
+        return RET_SKIP;
+    }
+
     return RET_NOTHING_DONE;
 }
 
@@ -462,7 +587,8 @@ unsigned AsmLine::EvaluateAtom() {
     else if (t == Scanner::T_LOGIC_NOT_OPER) {
         scanner.Next();
         val = EvaluateRelationals();
-        return (val & 0x01) ^ 0x01;  // Invert and return only the last bit
+        // NOT only the LSB and return FFFF for TRUE
+        return (val & 0x01) ? 0 : 0xffff; 
     }
 
     else if (t == Scanner::T_STRING) {
@@ -593,7 +719,7 @@ unsigned AsmLine::EvaluateRelationals() {
             case Scanner::V_NE: result = (num1 != num2); break;
         }
     }
-    return result ? 0xff : 0;
+    return result ? 0xffff : 0;
 }
 
 
@@ -641,8 +767,8 @@ unsigned AsmLine::EvaluateLogicalAnd() {
         scanner.Next();
         unsigned num2 = EvaluateBitwiseOr();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
-        // logical operators only check the last bit
-        num1 = (num1 & num2 & 0x01);
+        // logical operators only check the last bit and return FFFF for TRUE
+        num1 = (num1 & num2 & 0x01) ? 0xffff : 0;
     }
 
     return num1;
@@ -658,11 +784,11 @@ unsigned AsmLine::EvaluateLogicalOr() {
         scanner.Next();
         unsigned num2 = EvaluateLogicalAnd();
         if (num2 == EXPR_ERROR)  return EXPR_ERROR;
-        // logical operators only check the last bit
+        // logical operators only check the last bit and return FFFF for TRUE
         if (op == Scanner::V_OR) {
-            num1 = ((num1 | num2) & 0x01);
+            num1 = ((num1 | num2) & 0x01) ? 0xffff : 0;
         } else {
-            num1 = ((num1 ^ num2) & 0x01);
+            num1 = ((num1 ^ num2) & 0x01) ? 0xffff : 0;
         }
     }
 
@@ -685,10 +811,11 @@ void usage() {
     fprintf(stderr, "usage: %s [-b ssss:eeee] [-g aaaa] <file.asm>\n", "asm85");
     fprintf(stderr, "  -b  Specify an address range to output as a binary image\n");
     fprintf(stderr, "      The option for -b must be hex start and end in the form: ssss:eeee\n");
-    fprintf(stderr, "      Multiple -b options can be specified.  Each one will create a binary file.\n");
-    fprintf(stderr, "  -g  Specify a go address for the image to be wrtten the HEX file.\n");
+    fprintf(stderr, "      Multiple -b options can be specified.  Each one will create a binary file\n");
+    fprintf(stderr, "  -g  Specify a go address for the image to be wrtten the HEX file\n");
     fprintf(stderr, "      The option for -g must be 4-digit hex address\n");
-    fprintf(stderr, "  -v  Print version and exit.\n");
+    fprintf(stderr, "  -c  Print additional debug information for conditional directives\n");
+    fprintf(stderr, "  -v  Print version and exit\n");
     exit(-1);
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -709,9 +836,10 @@ int main(int argc, char * argv[]) {
     char * goAddr = NULL;
     int numBins = 0;
     int c;
+    bool debugConditionals = false;
 
     opterr = 0;
-    while ((c = getopt (argc, argv, "b:g:v")) != -1) {
+    while ((c = getopt (argc, argv, "b:g:cv")) != -1) {
         switch (c) {
         case 'b':
             if ((strlen(optarg) != 9) || (optarg[4] != ':') ||
@@ -729,6 +857,9 @@ int main(int argc, char * argv[]) {
                 usage();
             }
             goAddr = strdup(optarg);
+            break;
+        case 'c':
+            debugConditionals = true;
             break;
         case 'v':
             printf("asm85 8085 Assembler v%s by nib\n\n", version);
@@ -783,12 +914,13 @@ int main(int argc, char * argv[]) {
     // Pass 1.  Send all error output to stdout.
     // Compute addresses and store all labels in the symbol table.
     AsmLine asmLine;
-    int lineNum = 1;
-    int errorCount = 0;
-    int warningCount = 0;
+    pContext = NULL;
+    unsigned lineNum = 1;
+    unsigned errorCount = 0;
+    unsigned warningCount = 0;
     while(fgets(line, 256, asmFile)) {
         line[strcspn(line, "\r\n")] = '\0';
-        int status = asmLine.Process(line, addr, 1);
+        int status = asmLine.Process(line, lineNum, addr, 1);
         if (status == AsmLine::RET_PASS1_ERROR) {
             printf("%d: ERROR - %s\n", lineNum, asmLine.GetErrorMsg());
             ++errorCount;
@@ -801,6 +933,12 @@ int main(int argc, char * argv[]) {
         }
         ++lineNum;
     }
+
+    if (pContext) {
+        printf("%d: WARNING - %s\n", lineNum, "Found IF without ENDIF in pass 1");
+        pContext = ConditionalContext::DeleteAll(pContext);
+    }
+
     if (errorCount > 0) {
         // The listing isn't generated until the second pass.  If any errors
         // were detected that are specific to pass 1, just stop.
@@ -819,7 +957,7 @@ int main(int argc, char * argv[]) {
     lineNum = 1;
     while (fgets(line, 256, asmFile)) {
         line[strcspn(line, "\r\n")] = '\0';
-        int status = asmLine.Process(line, addr, 2);
+        int status = asmLine.Process(line, lineNum, addr, 2);
         addr = asmLine.GetStartAddr();
         // printf("addr=%04x  label=%s  mnem=%s  line=%s", addr, asmLine.pLabel, asmLine.pMnemonic, line);
 
@@ -840,6 +978,8 @@ int main(int argc, char * argv[]) {
             addr += asmLine.GetAuxValue();
         }
         else if (byteCount) {
+            // Print as many as 4 bytes of data on  the line.  If there are any
+            // additional bytes, they will be printed later on separate lines.
             fprintf(listFile, "%04x ", addr);
             for (int ix = 0; ((ix < byteCount) && (ix < 4)); ix++) {
                 fprintf(listFile, "%02x ", asmLine.GetBytes()[ix]);
@@ -850,6 +990,20 @@ int main(int argc, char * argv[]) {
         }
         else {
             fprintf(listFile, "                 ");
+        }
+
+        if (debugConditionals) {
+            if (pContext) {
+                fprintf(listFile, "%c%1u%1u%c", 
+                    pContext->bMatched ? '+' : ' ',
+                    pContext->nestLevel, // ? ' ' : '0' + pContext->nestLevel,
+                    pContext->skipLevel,// ? ' ' : '@' + pContext->skipLevel);
+                    pContext->bSkipping ? '-' : ' ');
+
+            }
+            else {
+                fprintf(listFile, "    ");
+            }
         }
 
         // Print the line and any error message.
@@ -886,7 +1040,14 @@ int main(int argc, char * argv[]) {
     }
     fclose(asmFile);
 
-    fprintf(listFile, "\n%d lines, %d errors, %d warnings\n", lineNum - 1, errorCount, warningCount);
+    if (pContext) {
+        printf("%d: ERROR - %s\n", lineNum, "Found IF without ENDIF");
+        fprintf(listFile, "%d: ERROR - %s\n", lineNum, "Found IF without ENDIF");
+        pContext = ConditionalContext::DeleteAll(pContext);
+        ++errorCount;
+    }
+
+    fprintf(listFile, "\n%u lines, %u errors, %u warnings\n", lineNum - 1, errorCount, warningCount);
     fprintf(listFile, "\n\nSYMBOL TABLE:\n\n");
     symbols.Dump(listFile);
     fprintf(listFile, "\n\nTotal memory is %d bytes\n", image.GetNumEntries());

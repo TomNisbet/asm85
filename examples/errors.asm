@@ -82,3 +82,35 @@ equ2    set 3           ; ERR: cannot redefine EQU
 lab3:   jmp 0           ; OK
 lab3:   jmp 1           ; ERR: label redefined
 lab4:   jmp 2           ; OK
+
+
+; Conditional directives
+YES         EQU 1
+TRUE        EQU 0ffffh
+NO          EQU 0
+FALSE       EQU 0
+
+                org 5000h
+; ERR - missing IF
+        ELSEIF YES                      ; ERR - missing IF
+        ELSE                            ; ERR - missing IF
+        ENDIF                           ; ERR - missing IF
+
+
+; ERR - multiple ELSE
+        IF FALSE                        ; OK
+        ELSE                            ; OK
+        ELSE                            ; ERR - multiple ELSE
+        ENDIF
+
+
+; ERR - ELSEIF follows ELSE
+        IF FALSE                        ; OK
+        ELSE                            ; OK
+        ELSEIF TRUE                     ; ERR - ELSEIF follows ELSE
+        ENDIF
+       
+
+; ERR - missing ENDIF
+        IF FALSE OR 3+1 EQ 4            ; OK
+                lxi h,0beefh

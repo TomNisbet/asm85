@@ -83,9 +83,7 @@ int Scanner::Next() {
         case '$':   tokenType = T_DOLLAR;                               break;
         case '(':   tokenType = T_OPEN_PAREN;                           break;
         case ')':   tokenType = T_CLOSE_PAREN;                          break;
-        case '|':   tokenType = T_BIT_OR_OPER;  tokenValue = V_OR;      break;
         case '^':   tokenType = T_BIT_OR_OPER;  tokenValue = V_XOR;     break;
-        case '&':   tokenType = T_BIT_AND_OPER; tokenValue = V_AND;     break;
         case '+':   tokenType = T_SUM_OPER;     tokenValue = V_PLUS;    break;
         case '-':   tokenType = T_SUM_OPER;     tokenValue = V_MINUS;   break;
         case '*':   tokenType = T_FACTOR_OPER;  tokenValue = V_MULTIPLY;break;
@@ -93,6 +91,24 @@ int Scanner::Next() {
         case '%':   tokenType = T_FACTOR_OPER;  tokenValue = V_MOD;     break;
         case '~':   tokenType = T_BIT_NOT_OPER; tokenValue = V_MOD;     break;
         case '=':   tokenType = T_RELATE_OPER;  tokenValue = V_EQ;      break;
+        case '|':
+            if (pCursor[1] == '|') {
+                tokenType = T_LOGIC_OR_OPER;
+                twochar = true;
+            } else {
+                tokenType = T_BIT_OR_OPER;
+            }
+            tokenValue = V_OR;
+            break;
+        case '&':
+            if (pCursor[1] == '&') {
+                tokenType = T_LOGIC_AND_OPER;
+                twochar = true;
+            } else {
+                tokenType = T_BIT_AND_OPER;
+            }
+            tokenValue = V_AND;
+            break;
         case '<':
             if (pCursor[1] == '<') {
                 tokenType = T_FACTOR_OPER;  

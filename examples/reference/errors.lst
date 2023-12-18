@@ -152,8 +152,51 @@ ERROR - symbol has already been defined: equ2
 ERROR - Symbol defined more than once: lab3
 
 0029 c3 02 00       84: lab4:   jmp 2           ; OK
+                    85: 
+                    86: 
+                    87: ; Conditional directives
+(0001)              88: YES         EQU 1
+(ffff)              89: TRUE        EQU 0ffffh
+(0000)              90: NO          EQU 0
+(0000)              91: FALSE       EQU 0
+                    92: 
+(5000)              93:                 org 5000h
+                    94: ; ERR - missing IF
+                    95:         ELSEIF YES                      ; ERR - missing IF
+ERROR - ELSE or ELSEIF found without matching IF
 
-84 lines, 34 errors, 0 warnings
+                    96:         ELSE                            ; ERR - missing IF
+ERROR - ELSE or ELSEIF found without matching IF
+
+                    97:         ENDIF                           ; ERR - missing IF
+ERROR - ENDIF found without matching IF
+
+                    98: 
+                    99: 
+                   100: ; ERR - multiple ELSE
+                   101:         IF FALSE                        ; OK
+                   102:         ELSE                            ; OK
+                   103:         ELSE                            ; ERR - multiple ELSE
+ERROR - ELSE or ELSEIF cannot follow ELSE
+
+                   104:         ENDIF
+                   105: 
+                   106: 
+                   107: ; ERR - ELSEIF follows ELSE
+                   108:         IF FALSE                        ; OK
+                   109:         ELSE                            ; OK
+                   110:         ELSEIF TRUE                     ; ERR - ELSEIF follows ELSE
+ERROR - ELSE or ELSEIF cannot follow ELSE
+
+                   111:         ENDIF
+                   112:        
+                   113: 
+                   114: ; ERR - missing ENDIF
+                   115:         IF FALSE OR 3+1 EQ 4            ; OK
+5000 21 ef be      116:                 lxi h,0beefh
+117: ERROR - Found IF without ENDIF
+
+116 lines, 40 errors, 0 warnings
 
 
 SYMBOL TABLE:
@@ -180,6 +223,10 @@ set1            : 0004 (4)
 equ2            : 0002 (2)
 lab3            : 0026 (38)
 lab4            : 0029 (41)
+YES             : 0001 (1)
+TRUE            : ffff (65535)
+NO              : 0000 (0)
+FALSE           : 0000 (0)
 
 
-Total memory is 34 bytes
+Total memory is 37 bytes

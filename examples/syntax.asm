@@ -22,6 +22,10 @@ NOSPACE:push    D               ; a space is not required after a label
 VeryVeryVeryLongLabel:
     db  "Labels can be up to 32 characters and must start with an alpha."
 
+; Names of alphabetic expression operations are reserved words in asm85 and cannot
+; be used as labels or names.  This is compatible with Intel85 as well.
+; Reserved words are: HIGH, LOW, MOD, SHL, SHR, EQ, NE, LE, LT, GE, GT, NOT, AND, OR, XOR.
+
 ; The EQU directive is used to define a constant value.  It does not emit
 ; any code.  The name label for an EQU does not need the trailing but it
 ; does need to be followed by whitespace.
@@ -155,49 +159,47 @@ PREC:
 ; give compatibility with other observed .asm files
 EXPR01: db      3 << 4, 128 >> 1 ; C++ style alias are provided for SHL and SHR
         db      99 % 8          ; C++ style alias is provided for MOD
+        db      1 && 0          ; C++ style alias is provided for logical AND
+        db      1 || 0          ; C++ style alias is provided for logical OR
         dw      EXPR01 = 0ffffH ; the = alias is provided for the EQ test
         dw      ~02211H         ; the ~ (tilde) performs bitwise NOT
         dw      't' & 5fH       ; the & (ampersand) performs bitwise AND
         dw      'T' | 20H       ; the | (vertical bar) performs bitwise OR
         dw      3377H ^ 1111H   ; the ^ (carat) performs bitwise XOR
 
-; The behavior of the logical (NOT, AND, OR, and XOR) operators isn't entirely
-; clear in the Intel85 manual.  The operations only evaluate the least significant
-; bit of the operand.  For example, the manual states that 1 is returned if both
-; ANDed bits are 1, so 0001 AND 0001 would return 0001.  It is not clear if other
-; bits are also ANDed or if they are masked.  For axample, 1001 AND 1011 could
-; return either 1001 or just 0001.  The relations (EQ, NE, LT, etc) operators
-; return 00H or FFH, so that would also be a reasonable model to follow.
-; The expression evaluator in asm85 will mask off all bits other than the LSB,
-; so 1011 AND 1011 will return 1.
-; In the end, it shouldn't matter because relational operators will only use the
-; LSB and this is the typical use of the logical operators.  The ambiguiity will
-; only be a problem if the results of a logical are used in an arithmetic or
-; bitwise expression.
-        db      NOT 0           ; 1
-        db      NOT 1           ; 0
-        db      NOT 0111B       ; 0, because LSB is 1
-        db      NOT 0110B       ; 1, because LSB is 0
-        db      0 AND 0         ; 0
-        db      1 AND 1         ; 1
-        db      1 AND 0         ; 0
-        db      0 AND 1         ; 0
-        db      2 AND 3         ; 0, both LSBs not 0
-        db      7 AND 3         ; 1, both LSBs are 1
-        db      0 OR 0          ; 0
-        db      1 OR 1          ; 1
-        db      1 OR 0          ; 1
-        db      0 OR 1          ; 1
-        db      2 OR 4          ; 0, both LSBs are 0
-        db      7 OR 3          ; 1, both LSBs are 1
-        db      0 XOR 0         ; 0, LSBs equal
-        db      1 XOR 1         ; 0, LSBs equal
-        db      1 XOR 0         ; 1, LSBs not equal
-        db      0 XOR 1         ; 1, LSBs not equal
-        db      2 XOR 3         ; 1, LSBs not equal
-        db      7 XOR 3         ; 0, LSBs equal
-        db      not not 0       ; 0
-        db      not not 1       ; 1
+; Logical operators
+; The behavior of the logical (NOT, AND, OR, and XOR) operators, as defined in
+; the Intel85 manual, is very different from C++.  The operations only evaluate
+; the least significant bit of the operand(s).  The manual section describing
+; IF/ELSE/ENDIF states that a logical FALSE evaluates to 0000H and a TRUE
+; is 0FFFFH.
+; Note that this is very different from C++, where any non-zero value is TRUE.
+; In C++ !4 is FALSE (0), but here it would be TRUE (FFFF) because 4 has a zero LSB.
+; The conditional operators only test the LSB as well. 
+        db      NOT 0           ; TRUE
+        db      NOT 1           ; FALSE
+        db      NOT 0111B       ; FALSE, because LSB is 1
+        db      NOT 0110B       ; TRUE, because LSB is 0
+        db      0 AND 0         ; FALSE
+        db      1 AND 1         ; TRUE
+        db      1 AND 0         ; FALSE
+        db      0 AND 1         ; FALSE
+        db      2 AND 3         ; FALSE, both LSBs not 0
+        db      7 AND 3         ; TRUE, both LSBs are 1
+        db      0 OR 0          ; FALSE
+        db      1 OR 1          ; TRUE
+        db      1 OR 0          ; TRUE
+        db      0 OR 1          ; TRUE
+        db      2 OR 4          ; FALSE, both LSBs are 0
+        db      7 OR 3          ; TRUE, both LSBs are 1
+        db      0 XOR 0         ; FALSE, LSBs equal
+        db      1 XOR 1         ; FALSE, LSBs equal
+        db      1 XOR 0         ; TRUE, LSBs not equal
+        db      0 XOR 1         ; TRUE, LSBs not equal
+        db      2 XOR 3         ; TRUE, LSBs not equal
+        db      7 XOR 3         ; FALSE, LSBs equal
+        db      not not 0       ; FALSE (0)
+        db      not not 1       ; TRUE (FFFF)
 
 ; Precedence of logical and relational operators
 ; From highest to lowest: EQ, NOT, AND, OR/XOR
@@ -206,11 +208,12 @@ EXPR01: db      3 << 4, 128 >> 1 ; C++ style alias are provided for SHL and SHR
         db      NOT (5 EQ 7)    ; same as above
         db      5 EQ 7 OR 1 EQ 1     ; EQ then OR
         db      (5 EQ 7) OR (1 EQ 1) ; same as above
-; But this is not
+; But this is not intuitive
         db      NOT 1 OR 1      ; NOT then OR
         db      (NOT 1) OR 1    ; same as above
         db      NOT (1 OR 1)    ; force the OR before the NOT
-; All of these evaluate to TRUE
+; The left and right sides of the following are eqivalent, so all of these evaluate
+; to TRUE
         db      (2 eq 3 or not 2 eq 3)   EQ  ((2 eq 3) or (not (2 eq 3)))
         db      (2 eq 3 and not 2 eq 3)  EQ  ((2 eq 3) and (not (2 eq 3)))
         db      (2 eq 3 xor not 2 eq 3)  EQ  ((2 eq 3) xor (not (2 eq 3)))
@@ -255,6 +258,109 @@ SP:     dw      256             ; define a word at location named SP
         LXI     H,SP+0
         LXI     H,0+SP
 
-; Names of alphabetic expression operations are reserved words in asm85 and cannot
-; be used as labels or names.  This is compatible with Intel85 as well.
-; Reserved words are: HIGH, LOW, MOD, SHL, SHR, EQ, NE, LE, LT, GE, GT, NOT, AND, OR, XOR.
+
+; Conditional directives
+YES         EQU 1
+TRUE        EQU 0ffffh
+NO          EQU 0
+FALSE       EQU 0
+
+; simple IF/ELSE conditional
+        IF TRUE                         ; match - all code in this block is included
+                org 4000h               ; all labels, directives, and code included
+EX1AVAR         equ 1234h
+EX1ADATA:       dw  EX1AVAR
+EX1A:           mov a,b
+
+        ELSE                            ; skip - no code in this block is included
+                org 8000h               ; all labels, directives, and code skipped
+EX1BVAR         equ 5678h
+EX1BDATA:       dw  EX1VAR
+EX1B:           mov a,c
+        ENDIF                           ; END conditional block
+
+
+; If/ELSEIF/ELSE
+                org 1000h
+        IF YES EQ NO                    ; skip FALSE
+                mov a,b
+        ELSEIF NOT TRUE                 ; skip FALSE
+                mov a,c
+        ELSEIF NOT FALSE                ; match TRUE
+                mov a,d
+        ELSEIF TRUE                     ; skip - already matched a previous block
+                mov a,e
+        ELSE                            ; skip - already matched a previous block
+                mov a,h
+        ENDIF
+
+
+; TRUE/FALSE values in conditionals
+; As explained in the logical operators section, the assembler only looks at
+; the least significant bit (LSB) of the value.  This effectively means that
+; zero and all even numbers are FALSE while all odd numbers are TRUE.
+        IF 4                            ; FALSE - 4 (0100B) has zero LSB
+                adi 11h
+        ELSEIF 4+2                      ; FALSE - 6 (0110B) has zero LSB
+                adi 22h
+        ELSEIF 4+1                      ; TRUE  - 5 (0101B) has one LSB
+                adi 33h
+        ENDIF
+
+
+; nested conditionals
+                org 0f000h
+        IF FALSE                        ; level 1 - skip
+          IF 0 NE 1                     ; level 2 - skip
+LABEL1:         ori 03h                 ; label and code skipped
+                jmp 45
+          ELSEIF FALSE                  ; level 2 - skip
+LABEL1:         ori 30h                 ; label and code included
+                jmp 67
+          ELSE                          ; level 2 - skip
+                jmp 12
+          ENDIF                         ; end level 2
+
+        ELSEIF YES                      ; level 1 - match
+                jmp 5555
+          IF NOT FALSE                  ; level 2 - match
+                jmp 6666
+            IF 0                        ; level 3 - skip
+                jmp 2222
+            ELSE                        ; level 3 match
+                mov c,a
+                jmp 3333
+            ENDIF                       ; end level 3
+                mvi a,11h               ; included in level 2 match
+                mvi b,22h               ; included in level 2 match
+
+          ELSE                          ; level 2 - skip
+                jmp 4444
+          ENDIF                         ; end level 2
+                mvi a,66h               ; included in level 1 match
+                mvi b,77h
+
+        ELSE                            ; level 1 - skip
+                mvi a,66h
+                mvi b,77h
+                jmp 12                  ; skipped from level 1 ELSE
+        ENDIF                           ; end level 1
+
+
+; Labels and conditionals
+; Any of the conditional directives (IF/ELSEIF/ELSE/ENDIF) can have a label.
+; This label will be included in the symbol table as long as the directive is
+; processed.  It does not matter if the directive evaluates to TRUE.
+; A label will not be included in the symbol table if the directive is nested
+; within another IF block that is false because the nested directive is not
+; evaluated in that case.
+IFLAB:  IF TRUE                         ; label included
+                jmp 6666
+ELSELAB:ELSE                            ; label included
+                mov c,a
+NOLAB1:         jmp 3333                ; labels ignored because they are nested in
+NOLAB2:   IF YES                        ; the ELSE above that did not match
+NOLAB3:         jmp 1111
+NOLAB4:   ENDIF
+ENDLAB: ENDIF                           ; label included
+
